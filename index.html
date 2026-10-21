@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1d1f22">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Flota">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Flota de carretillas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: barra de estado arriba, pestañas, rejilla de fichas de máquina; ficha de detalle como hoja lateral (PC) o inferior (móvil). */
+:root{
+  --bg:#f3f2ee; --surface:#ffffff; --sunk:#e9e7e1; --fg:#1d1f22; --muted:#62666d; --line:#d6d3cb;
+  --accent:#f2b705; --accent-ink:#1d1f22; --accent-soft:#fdf1c7;
+  --ok:#1f7a4d; --ok-bg:#dcf1e5; --rent:#1d5fa8; --rent-bg:#dde9f7; --bad:#b42318; --bad-bg:#fbe1de; --shop:#8a4b00; --shop-bg:#fbe9d2;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#16181b; --surface:#1f2226; --sunk:#272a2f; --fg:#eceae4; --muted:#a2a5ab; --line:#363a40;
+  --accent:#f5c22b; --accent-ink:#16181b; --accent-soft:#3a3218;
+  --ok:#5fd19a; --ok-bg:#183a2a; --rent:#8bbcf5; --rent-bg:#1a2c44; --bad:#ff8a7e; --bad-bg:#46201c; --shop:#f6b366; --shop-bg:#3e2a12; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#16181b; --surface:#1f2226; --sunk:#272a2f; --fg:#eceae4; --muted:#a2a5ab; --line:#363a40;
+  --accent:#f5c22b; --accent-ink:#16181b; --accent-soft:#3a3218;
+  --ok:#5fd19a; --ok-bg:#183a2a; --rent:#8bbcf5; --rent-bg:#1a2c44; --bad:#ff8a7e; --bad-bg:#46201c; --shop:#f6b366; --shop-bg:#3e2a12; color-scheme:dark}
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--fg)}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{background:var(--fg);color:var(--bg);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+header.top .wrap{display:flex;align-items:center;gap:14px;padding-block:12px;flex-wrap:wrap}
+.brand{font-family:var(--f-display);font-weight:700;font-size:26px;letter-spacing:.02em;text-transform:uppercase;display:flex;align-items:center;gap:10px}
+.brand i{display:inline-block;width:14px;height:26px;background:repeating-linear-gradient(-45deg,var(--accent) 0 6px,var(--fg) 6px 12px);border-radius:2px}
+.tabs{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.tabs button{background:transparent;color:var(--bg);border:1px solid transparent;font:600 14px var(--f-body);padding:7px 12px;border-radius:999px;cursor:pointer;opacity:.75}
+.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink);opacity:1}
+.tabs button:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.card:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.tabs .n{font-family:var(--f-mono);font-size:12px;margin-left:4px}
+
+.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;padding-block:18px 6px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;cursor:pointer;text-align:left;font:inherit;color:inherit}
+.stat[aria-pressed="true"]{border-color:var(--fg);box-shadow:inset 0 0 0 1px var(--fg)}
+.stat b{display:block;font-family:var(--f-display);font-size:34px;line-height:1;font-weight:600;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:flex;align-items:center;gap:6px}
+.stat .dot{width:9px;height:9px;border-radius:50%}
+.occ{grid-column:1/-1;height:8px;border-radius:4px;background:var(--sunk);overflow:hidden;display:flex}
+.occ div{height:100%}
+@media (max-width:640px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.stat.all{grid-column:1/-1}}
+
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-block:12px}
+.toolbar input[type=search]{flex:1 1 220px;min-width:0}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
+.toolbar select{width:auto}
+.btn{font:600 14px var(--f-body);border-radius:8px;padding:9px 14px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer;white-space:nowrap}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:default}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;padding-bottom:40px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:grid;gap:8px;cursor:pointer;text-align:left;font:inherit;color:inherit;position:relative}
+.card:hover{border-color:var(--muted)}
+.card .row1{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.code{font-family:var(--f-display);font-weight:700;font-size:28px;line-height:1;letter-spacing:.02em;text-transform:uppercase}
+.code.none{font-size:16px;font-weight:600;color:var(--muted);border:1.5px dashed var(--line);border-radius:6px;padding:4px 8px}
+.model{font-weight:600}
+.meta{display:flex;flex-wrap:wrap;gap:4px 12px;color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.serial{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.where{display:flex;align-items:center;gap:6px;font-size:14px;min-width:0}
+.where svg{flex:none}
+.where span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.flags{display:flex;gap:6px;flex-wrap:wrap}
+.flag{font-size:11px;font-weight:600;color:var(--bad);background:var(--bad-bg);border-radius:4px;padding:2px 6px}
+.flag.soft{color:var(--muted);background:var(--sunk)}
+.pill{font:600 12px var(--f-body);text-transform:uppercase;letter-spacing:.05em;border-radius:999px;padding:3px 9px;white-space:nowrap}
+.s-alquilada{color:var(--rent);background:var(--rent-bg)}
+.s-disponible{color:var(--ok);background:var(--ok-bg)}
+.s-averiada{color:var(--bad);background:var(--bad-bg)}
+.s-taller{color:var(--shop);background:var(--shop-bg)}
+.s-vendida{color:var(--muted);background:var(--sunk)}
+.empty{padding:48px 16px;text-align:center;color:var(--muted);grid-column:1/-1}
+.empty h3{font-family:var(--f-display);font-size:24px;color:var(--fg);margin:0 0 6px}
+
+h2.sec{font-family:var(--f-display);font-size:24px;text-transform:uppercase;letter-spacing:.03em;margin:22px 0 8px}
+.tablebox{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);margin-bottom:24px}
+table{border-collapse:collapse;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+th,td{padding:9px 12px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;background:var(--sunk)}
+tr:last-child td{border-bottom:0}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--accent-soft)}
+td.late{color:var(--bad);font-weight:600}
+.issues{display:grid;gap:8px;padding-bottom:40px}
+.issue{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--bad);border-radius:8px;padding:10px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;cursor:pointer}
+.issue.soft{border-left-color:var(--accent)}
+.issue b{font-family:var(--f-display);font-size:20px;min-width:70px}
+.issue div{flex:1 1 240px;min-width:0}
+
+/* Hoja de detalle */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20}
+.sheet{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:var(--bg);z-index:21;display:flex;flex-direction:column;box-shadow:-8px 0 30px rgba(0,0,0,.25);padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+@media (max-width:640px){.sheet{top:auto;height:92%;width:100%;border-radius:16px 16px 0 0;padding-left:env(safe-area-inset-left,0px)}}
+.sheet-h{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--surface)}
+.sheet-h .code{font-size:32px}
+.sheet-h .x{margin-left:auto}
+.sheet-b{overflow-y:auto;padding:16px 18px 32px;display:grid;gap:18px;align-content:start}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+dl.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;margin:0}
+dl.kv div{min-width:0}
+dl.kv dt{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+dl.kv dd{margin:2px 0 0;font-weight:500;overflow-wrap:anywhere}
+dl.kv dd.mono{font-family:var(--f-mono);font-size:13px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:grid;gap:12px}
+.box h3{margin:0;font-family:var(--f-display);font-size:20px;text-transform:uppercase;letter-spacing:.03em}
+.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.form label{display:grid;gap:4px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;min-width:0}
+.form label.full{grid-column:1/-1}
+.form .btns{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+@media (max-width:420px){.form,dl.kv{grid-template-columns:minmax(0,1fr)}}
+.hist{list-style:none;margin:0;padding:0;display:grid;gap:0}
+.hist li{display:grid;grid-template-columns:86px minmax(0,1fr);gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.hist li:last-child{border-bottom:0}
+.hist time{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.hist .t{font-weight:600}
+.note{font-size:13px;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;z-index:30;font-weight:500}
+.banner{background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;padding:10px 14px;margin-top:14px;font-size:14px}
+@media (prefers-reduced-motion:no-preference){.sheet{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(30px);opacity:.6}}}
+.who{display:flex;align-items:center;gap:8px;font-size:13px;opacity:.85}
+.who button{background:transparent;color:var(--bg);border:1px solid color-mix(in srgb,var(--bg) 40%,transparent);border-radius:6px;padding:4px 8px;font:inherit;cursor:pointer}
+.login{min-height:80vh;display:grid;place-items:center}
+.login form{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px;width:min(380px,100%);display:grid;gap:12px}
+.login h1{font-family:var(--f-display);text-transform:uppercase;font-size:30px;margin:0}
+.login label{display:grid;gap:4px;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.err{color:var(--bad);font-size:14px;min-height:1.2em}
+</style>
+</head>
+<body>
+<div id="loginView" class="wrap login" hidden>
+  <form id="loginForm">
+    <h1>Flota de alquiler</h1>
+    <p class="note" style="margin:0">Entra con el correo y la contraseña que te ha dado el administrador.</p>
+    <label for="lg_email">Correo<input id="lg_email" type="email" autocomplete="username" required></label>
+    <label for="lg_pass">Contraseña<input id="lg_pass" type="password" autocomplete="current-password" required></label>
+    <div class="err" id="lg_err"></div>
+    <button class="btn primary">Entrar</button>
+  </form>
+</div>
+<div id="appView" hidden>
+
+<header class="top"><div class="wrap">
+  <div class="brand"><i aria-hidden="true"></i>Flota de alquiler</div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="maquinas" aria-selected="true">Máquinas</button>
+    <button role="tab" data-tab="alquileres" aria-selected="false">Alquileres <span class="n" id="nRent"></span></button>
+    <button role="tab" data-tab="taller" aria-selected="false">Taller y revisiones <span class="n" id="nRev"></span></button>
+    <button role="tab" data-tab="avisos" aria-selected="false">Avisos <span class="n" id="nIss"></span></button>
+  </nav>
+  <div class="who"><span id="whoEmail"></span><button id="pwBtn" type="button">Cambiar contraseña</button><button id="outBtn" type="button">Salir</button></div>
+</div></header>
+
+<main class="wrap">
+  <div id="banner"></div>
+  <section id="v-maquinas">
+    <div class="stats" id="stats"></div>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Buscar nº, modelo, serie, cliente…" aria-label="Buscar">
+      <select id="fComb" aria-label="Combustible"><option value="">Eléctricas y diésel</option><option>Eléctrica</option><option>Diésel</option></select>
+      <select id="fLoc" aria-label="Ubicación"><option value="">Todas las ubicaciones</option></select>
+      <button class="btn primary" id="addBtn">+ Añadir máquina</button>
+      <button class="btn ghost" id="csvBtn" hidden>Exportar a Excel (CSV)</button>
+    </div>
+    <div class="grid" id="grid"><div class="empty"><h3>Cargando la flota…</h3>Conectando con la base de datos.</div></div>
+  </section>
+  <section id="v-alquileres" hidden></section>
+  <section id="v-taller" hidden></section>
+  <section id="v-avisos" hidden></section>
+</main>
+<div id="sheetRoot"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+const ST = {
+  alquilada:{l:"Alquilada",c:"var(--rent)"},
+  disponible:{l:"Disponible",c:"var(--ok)"},
+  averiada:{l:"Averiada",c:"var(--bad)"},
+  taller:{l:"En taller",c:"var(--shop)"},
+  vendida:{l:"Vendida",c:"var(--muted)"}
+};
+const NAVES = ["NAVE 1","NAVE 2"];
+let sb=null, me=null, db=true, canWrite=true, machines=[], moves=[], filt={st:"",q:"",comb:"",loc:""}, openId=null, mode="view";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const today=()=>new Date().toISOString().slice(0,10);
+const fmtD=d=>d?d.slice(8,10)+"/"+d.slice(5,7)+"/"+d.slice(0,4):"—";
+const eur=n=>n==null||n===""?"—":Number(n).toLocaleString("es-ES")+" €";
+const addMonths=(d,n)=>{const x=new Date(d+"T12:00");x.setMonth(x.getMonth()+Number(n));return x.toISOString().slice(0,10)};
+const fmtH=n=>n==null||n===""?"—":Number(n).toLocaleString("es-ES")+" h";
+const daysTo=d=>Math.round((new Date(d+"T12:00")-new Date(today()+"T12:00"))/864e5);
+const pin='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>';
+const shed='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 21V9l9-5 9 5v12"/><path d="M8 21v-7h8v7"/></svg>';
+
+function toast(t){const e=document.createElement("div");e.className="toast";e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),2600)}
+
+function issuesOf(m){
+  const out=[];
+  if(!m.codigo) out.push({k:"Sin número interno",h:1});
+  if(!m.poliza) out.push({k:"Sin póliza de seguro",h:1});
+  if(!m.serie) out.push({k:"Sin nº de serie",h:1});
+  if(!m.anio) out.push({k:"Año desconocido",h:0});
+  if(m.pvp==null||m.pvp==="") out.push({k:"Sin PVP",h:0});
+  else if(m.coste!=null&&Number(m.coste)>Number(m.pvp)) out.push({k:"Coste mayor que el PVP",h:0});
+  if(m.situacion==="alquilada"&&m.alquiler?.fin&&daysTo(m.alquiler.fin)<0) out.push({k:"Alquiler vencido",h:1});
+  if(m.horas==null||m.horas==="") out.push({k:"Sin horas anotadas",h:0});
+  else if(m.proximaRevisionH){const f=Number(m.proximaRevisionH)-Number(m.horas);
+    if(f<=0) out.push({k:"Revisión vencida por horas",h:1}); else if(f<=50) out.push({k:"Revisión en menos de 50 h",h:0});}
+  if(m.proximaRevisionFecha){const dd=daysTo(m.proximaRevisionFecha);
+    if(dd<0) out.push({k:"Revisión vencida por fecha",h:1}); else if(dd<=30) out.push({k:"Revisión en menos de 30 días",h:0});}
+  if(!m.proximaRevisionH&&!m.proximaRevisionFecha) out.push({k:"Sin plan de revisiones",h:0});
+  if(m.situacion==="alquilada"&&!m.alquiler?.inicio) out.push({k:"Alquiler sin fecha de inicio",h:0});
+  return out;
+}
+function label(m){return m.codigo?m.codigo.toUpperCase():"Sin nº"}
+
+/* ---------- vistas ---------- */
+function render(){
+  renderStats(); renderGrid(); renderRentals(); renderTaller(); renderIssues();
+  if(openId&&mode==="view") renderSheet();
+}
+function renderStats(){
+  const act=machines.filter(m=>m.situacion!=="vendida");
+  const c=k=>act.filter(m=>m.situacion===k).length;
+  const tot=act.length||1;
+  const keys=["alquilada","disponible","averiada","taller"];
+  $("#stats").innerHTML=
+    `<button class="stat all" data-st="" aria-pressed="${filt.st===""}"><span>Flota activa</span><b>${act.length}</b></button>`+
+    keys.map(k=>`<button class="stat" data-st="${k}" aria-pressed="${filt.st===k}"><span><i class="dot" style="background:${ST[k].c}"></i>${ST[k].l}</span><b>${c(k)}</b></button>`).join("")+
+    `<div class="occ" title="Ocupación: ${Math.round(c("alquilada")/tot*100)}% alquilada">${keys.map(k=>`<div style="width:${c(k)/tot*100}%;background:${ST[k].c}"></div>`).join("")}</div>`;
+  const locs=[...new Set(machines.map(m=>m.ubicacion).filter(Boolean))].sort((a,b)=>(NAVES.includes(b)-NAVES.includes(a))||a.localeCompare(b));
+  const cur=$("#fLoc").value;
+  $("#fLoc").innerHTML='<option value="">Todas las ubicaciones</option>'+locs.map(l=>`<option ${l===cur?"selected":""}>${esc(l)}</option>`).join("");
+}
+function sortKey(m){const order={averiada:0,taller:1,disponible:2,alquilada:3,vendida:4};return [order[m.situacion]??5,m.codigo?0:1,(m.codigo||m.modelo||"").padStart(6,"0")]}
+function cmp(a,b){const x=sortKey(a),y=sortKey(b);for(let i=0;i<x.length;i++){if(x[i]<y[i])return -1;if(x[i]>y[i])return 1}return 0}
+const QUIET=["Sin plan de revisiones","Sin horas anotadas"];
+function renderGrid(){
+  const q=filt.q.trim().toLowerCase();
+  const list=machines.filter(m=>(!filt.st||m.situacion===filt.st)&&(!filt.comb||m.combustible===filt.comb)&&(!filt.loc||m.ubicacion===filt.loc)&&
+    (!q||[m.codigo,m.marca,m.modelo,m.serie,m.ubicacion,m.poliza,m.notas].join(" ").toLowerCase().includes(q))).sort(cmp);
+  if(!db){return}
+  if(!machines.length){$("#grid").innerHTML=`<div class="empty"><h3>Aún no hay máquinas</h3>Pulsa «Añadir máquina» para dar de alta la primera.</div>`;return}
+  if(!list.length){$("#grid").innerHTML=`<div class="empty"><h3>Ninguna máquina coincide</h3>Prueba a quitar algún filtro.</div>`;return}
+  $("#grid").innerHTML=list.map(m=>{
+    let iss=issuesOf(m); const inNave=NAVES.includes(m.ubicacion);
+    const fin=m.situacion==="alquilada"&&m.alquiler?.fin?` · hasta ${fmtD(m.alquiler.fin)}`:"";
+    return `<button class="card" data-id="${m.id}">
+      <div class="row1"><span class="code ${m.codigo?"":"none"}">${esc(label(m))}</span><span class="pill s-${m.situacion}">${ST[m.situacion]?.l||esc(m.situacion)}</span></div>
+      <div><div class="model">${esc(m.marca)} ${esc(m.modelo)}</div><div class="serial">${m.serie?"S/N "+esc(m.serie):"Sin nº de serie"}</div></div>
+      <div class="meta"><span>${esc(m.combustible)}</span><span>${m.potenciaKw?String(m.potenciaKw).replace(".",",")+" kW":""}</span><span>${m.anio||"Año ¿?"}</span><span>${m.alturaMastil?m.alturaMastil+" mm":esc(m.mastil)}</span>${m.horas!=null&&m.horas!==""?`<span><b style="color:var(--fg)">${fmtH(m.horas)}</b></span>`:""}</div>
+      <div class="where">${inNave?shed:pin}<span>${esc(m.ubicacion||"—")}${esc(fin)}</span></div>
+      ${(iss=iss.filter(i=>!QUIET.includes(i.k))).length?`<div class="flags">${iss.map(i=>`<span class="flag ${i.h?"":"soft"}">${esc(i.k)}</span>`).join("")}</div>`:""}
+    </button>`}).join("");
+}
+function renderRentals(){
+  const r=machines.filter(m=>m.situacion==="alquilada").sort((a,b)=>(a.alquiler?.fin||"9").localeCompare(b.alquiler?.fin||"9"));
+  $("#nRent").textContent=r.length;
+  const sumMes=r.reduce((s,m)=>s+(Number(m.alquiler?.precioMes)||0),0);
+  const byCli={};r.forEach(m=>{(byCli[m.ubicacion]=byCli[m.ubicacion]||[]).push(m)});
+  $("#v-alquileres").innerHTML=`<h2 class="sec">Máquinas en clientes</h2>
+  <p class="note">${r.length} alquiladas a ${Object.keys(byCli).length} clientes${sumMes?` · ${eur(sumMes)} al mes en contratos con precio`:""}. Pulsa una fila para ver la máquina.</p>
+  <div class="tablebox"><table><thead><tr><th>Nº</th><th>Máquina</th><th>Cliente</th><th>Desde</th><th>Hasta</th><th>Quedan</th><th>€/mes</th><th>Horas</th><th>h en alquiler</th></tr></thead><tbody>
+  ${r.map(m=>{const a=m.alquiler||{},d=a.fin?daysTo(a.fin):null;
+    return `<tr class="click" data-id="${m.id}"><td><b>${esc(label(m))}</b></td><td>${esc(m.marca)} ${esc(m.modelo)}</td><td>${esc(m.ubicacion)}</td><td>${fmtD(a.inicio)}</td><td>${fmtD(a.fin)}</td><td class="${d!=null&&d<0?"late":""}">${d==null?"Sin fecha":d<0?`Vencido hace ${-d} d`:`${d} d`}</td><td>${eur(a.precioMes)}</td><td>${fmtH(m.horas)}</td><td>${a.horasInicio!=null&&m.horas!=null&&m.horas!==""?fmtH(Number(m.horas)-Number(a.horasInicio)):"—"}</td></tr>`}).join("")||`<tr><td colspan="9">No hay máquinas alquiladas.</td></tr>`}
+  </tbody></table></div>`;
+}
+const AV=["Avería","Enviada a taller","Reparada"];
+function renderTaller(){
+  const act=machines.filter(m=>m.situacion!=="vendida");
+  const plan=act.map(m=>{const fh=m.proximaRevisionH&&m.horas!=null&&m.horas!==""?Number(m.proximaRevisionH)-Number(m.horas):null;
+    const fd=m.proximaRevisionFecha?daysTo(m.proximaRevisionFecha):null;
+    const st=(fh!=null&&fh<=0)||(fd!=null&&fd<0)?2:(fh!=null&&fh<=50)||(fd!=null&&fd<=30)?1:(fh==null&&fd==null)?-1:0;
+    return {m,fh,fd,st}}).sort((a,b)=>b.st-a.st||((a.fd??1e9)-(b.fd??1e9))||((a.fh??1e9)-(b.fh??1e9)));
+  const due=plan.filter(p=>p.st===2).length,soon=plan.filter(p=>p.st===1).length,none=plan.filter(p=>p.st===-1).length;
+  $("#nRev").textContent=due||"";
+  const tag=p=>p.st===2?'<span class="pill s-averiada">Vencida</span>':p.st===1?'<span class="pill s-taller">Pronto</span>':p.st===0?'<span class="pill s-disponible">Al día</span>':'<span class="pill s-vendida">Sin plan</span>';
+  const av=moves.filter(x=>AV.includes(x.tipo)).sort((a,b)=>(b.fecha+b.creado).localeCompare(a.fecha+a.creado));
+  const byM={};av.filter(x=>x.tipo==="Avería").forEach(x=>byM[x.maquina]=(byM[x.maquina]||0)+1);
+  const costM={};moves.filter(x=>x.coste).forEach(x=>costM[x.maquina]=(costM[x.maquina]||0)+Number(x.coste));
+  const name=id=>{const m=machines.find(x=>x.id===id);return m?`<b>${esc(label(m))}</b> ${esc(m.marca)} ${esc(m.modelo)}`:"Máquina borrada"};
+  const top=Object.keys({...byM,...costM}).map(id=>({id,n:byM[id]||0,c:costM[id]||0})).sort((a,b)=>b.n-a.n||b.c-a.c).slice(0,8);
+  $("#v-taller").innerHTML=`<h2 class="sec">Plan de revisiones</h2>
+  <p class="note">${due} vencidas · ${soon} en los próximos 30 días o 50 h · ${none} sin plan. Para fijar el plan de una máquina, ábrela y pulsa «Revisión hecha» (o «Editar datos» si ya sabes la próxima).</p>
+  <div class="tablebox"><table><thead><tr><th>Estado</th><th>Nº</th><th>Máquina</th><th>Horas</th><th>Última revisión</th><th>Próxima (h)</th><th>Faltan</th><th>Próxima (fecha)</th><th>Faltan</th></tr></thead><tbody>
+  ${plan.map(p=>{const m=p.m;return `<tr class="click" data-id="${m.id}"><td>${tag(p)}</td><td><b>${esc(label(m))}</b></td><td>${esc(m.marca)} ${esc(m.modelo)}</td><td>${fmtH(m.horas)}</td><td>${m.ultimaRevisionFecha?fmtD(m.ultimaRevisionFecha):"—"}</td><td>${fmtH(m.proximaRevisionH)}</td><td class="${p.fh!=null&&p.fh<=0?"late":""}">${p.fh==null?"—":p.fh<=0?"Pasada "+fmtH(-p.fh):fmtH(p.fh)}</td><td>${fmtD(m.proximaRevisionFecha)}</td><td class="${p.fd!=null&&p.fd<0?"late":""}">${p.fd==null?"—":p.fd<0?`Hace ${-p.fd} d`:p.fd+" d"}</td></tr>`}).join("")}
+  </tbody></table></div>
+  <h2 class="sec">Historial de averías</h2>
+  ${top.length?`<p class="note">Máquinas con más averías: ${top.map(t=>`${name(t.id)} (${t.n} avería${t.n===1?"":"s"}${t.c?", "+eur(t.c)+" en taller":""})`).join(" · ")}</p>`:""}
+  <div class="tablebox"><table><thead><tr><th>Fecha</th><th>Qué</th><th>Máquina</th><th>Cliente</th><th>Detalle</th></tr></thead><tbody>
+  ${av.map(x=>`<tr class="click" data-id="${x.maquina}"><td>${fmtD(x.fecha)}</td><td><span class="pill ${x.tipo==="Avería"?"s-averiada":x.tipo==="Reparada"?"s-disponible":"s-taller"}">${esc(x.tipo)}</span></td><td>${name(x.maquina)}</td><td>${esc(x.cliente||"")}</td><td style="white-space:normal;min-width:220px">${esc(x.detalle)}</td></tr>`).join("")||`<tr><td colspan="5">Aún no hay averías anotadas. Cuando una máquina se estropee, ábrela y pulsa «Anotar avería»; al repararla, «Reparada». Todo queda aquí.</td></tr>`}
+  </tbody></table></div>`;
+}
+function renderIssues(){
+  const rows=[];machines.filter(m=>m.situacion!=="vendida").forEach(m=>issuesOf(m).forEach(i=>rows.push({m,...i})));
+  rows.sort((a,b)=>b.h-a.h||a.k.localeCompare(b.k));
+  $("#nIss").textContent=rows.filter(r=>r.h).length||"";
+  const groups={};rows.forEach(r=>{(groups[r.k]=groups[r.k]||[]).push(r)});
+  $("#v-avisos").innerHTML=`<h2 class="sec">Datos que faltan o no cuadran</h2>
+  <p class="note">Rellena estos datos desde la ficha de cada máquina (botón «Editar datos»). Los avisos rojos son los más importantes.</p>
+  ${Object.entries(groups).map(([k,rs])=>`<h2 class="sec" style="font-size:18px">${esc(k)} · ${rs.length}</h2><div class="issues">${rs.map(r=>`<div class="issue ${r.h?"":"soft"}" data-id="${r.m.id}" tabindex="0"><b>${esc(label(r.m))}</b><div>${esc(r.m.marca)} ${esc(r.m.modelo)} <span class="serial">${esc(r.m.serie||"")}</span><br><span class="note">${esc(r.m.ubicacion)}${r.k.startsWith("Coste")?` · coste ${eur(r.m.coste)}, PVP ${eur(r.m.pvp)}`:""}</span></div></div>`).join("")}</div>`).join("")||`<div class="empty"><h3>Todo en orden</h3>No hay datos pendientes.</div>`}`;
+}
+
+/* ---------- ficha ---------- */
+function openSheet(id,m0){openId=id;mode=m0||"view";renderSheet()}
+function closeSheet(){openId=null;$("#sheetRoot").innerHTML=""}
+const F=[["codigo","Nº interno","text"],["situacion","Situación","st"],["marca","Marca","text"],["modelo","Modelo","text"],["serie","Nº de serie","text"],["combustible","Combustible","comb"],["potenciaKw","Potencia (kW)","number"],["anio","Año","number"],["coste","Coste (€)","number"],["pvp","PVP (€)","number"],["mastil","Mástil","text"],["alturaMastil","Altura mástil (mm)","number"],["ruedas","Nº ruedas","number"],["horas","Horas contador","number"],["revisionCadaH","Revisión cada (h)","number"],["revisionCadaMeses","Revisión cada (meses)","number"],["proximaRevisionH","Próxima revisión a (h)","number"],["proximaRevisionFecha","Próxima revisión (fecha)","date"],["ubicacion","Ubicación / cliente","text"],["poliza","Póliza de seguro","text"],["notas","Notas","area"]];
+function field([k,l,t],v){
+  const id="f_"+k;
+  if(t==="st")return `<label for="${id}">${l}<select id="${id}" name="${k}">${Object.entries(ST).map(([s,o])=>`<option value="${s}" ${v===s?"selected":""}>${o.l}</option>`).join("")}</select></label>`;
+  if(t==="comb")return `<label for="${id}">${l}<select id="${id}" name="${k}">${["Eléctrica","Diésel","Gas (GLP)"].map(s=>`<option ${v===s?"selected":""}>${s}</option>`).join("")}</select></label>`;
+  if(t==="area")return `<label class="full" for="${id}">${l}<textarea id="${id}" name="${k}" rows="2">${esc(v)}</textarea></label>`;
+  return `<label for="${id}">${l}<input id="${id}" name="${k}" type="${t}" ${t==="number"?'step="any" inputmode="decimal"':""} value="${esc(v??"")}" ${k==="ubicacion"?'list="locs"':""}></label>`;
+}
+function renderSheet(){
+  const isNew=openId==="__new";
+  const m=isNew?{situacion:"disponible",combustible:"Eléctrica",ubicacion:"NAVE 1"}:machines.find(x=>x.id===openId);
+  if(!m){closeSheet();return}
+  const h=moves.filter(x=>x.maquina===openId).sort((a,b)=>(b.fecha+b.creado).localeCompare(a.fecha+a.creado));
+  const locs=[...new Set(machines.map(x=>x.ubicacion).filter(Boolean))];
+  let body="";
+  const naveSel=(id)=>`<label for="${id}">Nave<select id="${id}" name="nave">${NAVES.map(n=>`<option ${m.ubicacion===n?"selected":""}>${n}</option>`).join("")}</select></label>`;
+  const forms={
+    alquilar:`<form class="box" data-act="alquilar"><h3>Alquilar</h3><div class="form">
+      <label class="full" for="a_cli">Cliente<input id="a_cli" name="cliente" required list="locs" placeholder="Nombre del cliente"></label>
+      <label for="a_ini">Inicio<input id="a_ini" name="inicio" type="date" value="${today()}" required></label>
+      <label for="a_fin">Fin previsto<input id="a_fin" name="fin" type="date"></label>
+      <label for="a_pre">Precio al mes (€)<input id="a_pre" name="precioMes" type="number" step="any" inputmode="decimal"></label>
+      <label for="a_hor">Horas contador<input id="a_hor" name="horas" type="number" inputmode="numeric"></label>
+      <label class="full" for="a_not">Notas<input id="a_not" name="detalle" placeholder="Ej. entrega con batería cargada"></label>
+      <div class="btns"><button type="button" class="btn ghost" data-cancel>Cancelar</button><button class="btn primary">Guardar alquiler</button></div></div></form>`,
+    devolver:`<form class="box" data-act="devolver"><h3>Recoger del cliente</h3><div class="form">
+      <label for="d_fec">Fecha<input id="d_fec" name="fecha" type="date" value="${today()}" required></label>${naveSel("d_nave")}
+      <label for="d_hor">Horas contador<input id="d_hor" name="horas" type="number" inputmode="numeric"></label>
+      <label for="d_est">Llega<select id="d_est" name="estado"><option value="disponible">En buen estado</option><option value="averiada">Averiada</option></select></label>
+      <label class="full" for="d_not">Notas<input id="d_not" name="detalle"></label>
+      <div class="btns"><button type="button" class="btn ghost" data-cancel>Cancelar</button><button class="btn primary">Guardar recogida</button></div></div></form>`,
+    averia:`<form class="box" data-act="averia"><h3>Anotar avería</h3><div class="form">
+      <label for="v_fec">Fecha<input id="v_fec" name="fecha" type="date" value="${today()}" required></label>
+      <label class="full" for="v_not">¿Qué le pasa?<textarea id="v_not" name="detalle" rows="2" required></textarea></label>
+      <div class="btns"><button type="button" class="btn ghost" data-cancel>Cancelar</button><button class="btn primary">Guardar avería</button></div></div></form>`,
+    taller:`<form class="box" data-act="taller"><h3>Enviar a taller</h3><div class="form">
+      <label for="t_fec">Fecha<input id="t_fec" name="fecha" type="date" value="${today()}" required></label>
+      <label for="t_qui">Taller / mecánico<input id="t_qui" name="taller"></label>
+      <label class="full" for="t_not">Trabajo a hacer<textarea id="t_not" name="detalle" rows="2"></textarea></label>
+      <div class="btns"><button type="button" class="btn ghost" data-cancel>Cancelar</button><button class="btn primary">Guardar</button></div></div></form>`,
+    reparada:`<form class="box" data-act="reparada"><h3>Reparación terminada</h3><div class="form">
+      <label for="r_fec">Fecha<input id="r_fec" name="fecha" type="date" value="${today()}" required></label>${naveSel("r_nave")}
+      <label for="r_hor">Horas contador<input id="r_hor" name="horas" type="number" inputmode="numeric"></label>
+      <label for="r_cos">Coste reparación (€)<input id="r_cos" name="coste" type="number" step="any" inputmode="decimal"></label>
+      <label class="full" for="r_not">Qué se hizo<textarea id="r_not" name="detalle" rows="2"></textarea></label>
+      <div class="btns"><button type="button" class="btn ghost" data-cancel>Cancelar</button><button class="btn primary">Marcar disponible</button></div></div></form>`,
+    revision:`<form class="box" data-act="revision"><h3>Revisión hecha</h3><div class="form">
+      <label for="rv_fec">Fecha<input id="rv_fec" name="fecha" type="date" value="${today()}" required></label>
+      <label for="rv_hor">Horas contador<input id="rv_hor" name="horas" type="number" inputmode="numeric" placeholder="${m.horas!=null&&m.horas!==""?"Última: "+m.horas:""}"></label>
+      <label for="rv_ch">Revisión cada (h)<input id="rv_ch" name="cadaH" type="number" inputmode="numeric" value="${esc(m.revisionCadaH??"")}" placeholder="Ej. 500"></label>
+      <label for="rv_cm">Revisión cada (meses)<input id="rv_cm" name="cadaM" type="number" inputmode="numeric" value="${esc(m.revisionCadaMeses??"")}" placeholder="Ej. 6"></label>
+      <label for="rv_cos">Coste (€)<input id="rv_cos" name="coste" type="number" step="any" inputmode="decimal"></label>
+      <label for="rv_qui">Hecha por<input id="rv_qui" name="taller" placeholder="Taller o mecánico"></label>
+      <label class="full" for="rv_not">Trabajos (aceite, filtros, frenos…)<textarea id="rv_not" name="detalle" rows="2"></textarea></label>
+      <p class="note full" style="grid-column:1/-1;margin:0">La próxima revisión se calcula sola: horas de hoy + intervalo, y fecha de hoy + meses.</p>
+      <div class="btns"><button type="button" class="btn ghost" data-cancel>Cancelar</button><button class="btn primary">Guardar revisión</button></div></div></form>`,
+    horas:`<form class="box" data-act="horas"><h3>Anotar horas</h3><div class="form">
+      <label for="h_fec">Fecha de lectura<input id="h_fec" name="fecha" type="date" value="${today()}" required></label>
+      <label for="h_hor">Horas del contador<input id="h_hor" name="horas" type="number" inputmode="numeric" required min="0" placeholder="${m.horas!=null&&m.horas!==""?"Última: "+m.horas:""}"></label>
+      <label class="full" for="h_not">Notas<input id="h_not" name="detalle" placeholder="Ej. leído por el cliente por teléfono"></label>
+      <div class="btns"><button type="button" class="btn ghost" data-cancel>Cancelar</button><button class="btn primary">Guardar horas</button></div></div></form>`,
+    nota:`<form class="box" data-act="nota"><h3>Añadir nota</h3><div class="form">
+      <label for="n_fec">Fecha<input id="n_fec" name="fecha" type="date" value="${today()}" required></label>
+      <label for="n_tip">Tipo<select id="n_tip" name="tipo"><option>Nota</option><option>Seguro</option><option>Cambio de batería</option></select></label>
+      <label for="n_hor">Horas contador (opcional)<input id="n_hor" name="horas" type="number" inputmode="numeric"></label>
+      <label class="full" for="n_not">Texto<textarea id="n_not" name="detalle" rows="2" required></textarea></label>
+      <div class="btns"><button type="button" class="btn ghost" data-cancel>Cancelar</button><button class="btn primary">Guardar nota</button></div></div></form>`
+  };
+  if(mode==="edit"||isNew){
+    body=`<form class="box" data-act="editar"><h3>${isNew?"Nueva máquina":"Editar datos"}</h3><div class="form">${F.map(f=>field(f,m[f[0]])).join("")}
+      <div class="btns">${isNew?"":`<button type="button" class="btn danger" data-del>Borrar máquina</button>`}<button type="button" class="btn ghost" data-cancel>Cancelar</button><button class="btn primary">Guardar</button></div></div></form>`;
+  }else if(forms[mode]){body=forms[mode]}
+  else{
+    const a=m.alquiler||{};
+    const acts=[];
+    if(m.situacion==="disponible")acts.push(["alquilar","Alquilar","primary"]);
+    if(m.situacion==="alquilada")acts.push(["devolver","Recoger del cliente","primary"]);
+    if(m.situacion!=="averiada"&&m.situacion!=="taller"&&m.situacion!=="vendida")acts.push(["averia","Anotar avería",""]);
+    if(m.situacion==="averiada")acts.push(["taller","Enviar a taller","primary"]);
+    if(m.situacion==="averiada"||m.situacion==="taller")acts.push(["reparada","Reparada","primary"]);
+    acts.push(["horas","Anotar horas",""],["revision","Revisión hecha",""],["nota","Añadir nota",""],["edit","Editar datos","ghost"]);
+    const iss=issuesOf(m);
+    body=`${canWrite?`<div class="actions">${acts.map(([k,l,c])=>`<button class="btn ${c}" data-mode="${k}">${l}</button>`).join("")}</div>`:`<p class="note">Solo puedes consultar esta ficha.</p>`}
+    ${iss.length?`<div class="flags">${iss.map(i=>`<span class="flag ${i.h?"":"soft"}">${esc(i.k)}</span>`).join("")}</div>`:""}
+    ${m.situacion==="alquilada"?`<div class="box"><h3>Alquiler en curso</h3><dl class="kv">
+      <div><dt>Cliente</dt><dd>${esc(m.ubicacion)}</dd></div><div><dt>Precio al mes</dt><dd>${eur(a.precioMes)}</dd></div>
+      <div><dt>Horas al salir</dt><dd>${fmtH(a.horasInicio)}</dd></div><div><dt>Horas en este alquiler</dt><dd>${a.horasInicio!=null&&m.horas!=null?fmtH(Number(m.horas)-Number(a.horasInicio)):"—"}</dd></div>
+      <div><dt>Desde</dt><dd>${fmtD(a.inicio)}</dd></div><div><dt>Hasta</dt><dd>${fmtD(a.fin)}${a.fin&&daysTo(a.fin)<0?' <span class="flag">Vencido</span>':""}</dd></div></dl></div>`:""}
+    <div class="box"><h3>Datos de la máquina</h3><dl class="kv">
+      <div><dt>Marca y modelo</dt><dd>${esc(m.marca)} ${esc(m.modelo)}</dd></div>
+      <div><dt>Nº de serie</dt><dd class="mono">${esc(m.serie||"—")}</dd></div>
+      <div><dt>Combustible</dt><dd>${esc(m.combustible)}</dd></div>
+      <div><dt>Potencia tracción</dt><dd>${m.potenciaKw?String(m.potenciaKw).replace(".",",")+" kW":"—"}</dd></div>
+      <div><dt>Año</dt><dd>${m.anio||"Desconocido"}</dd></div>
+      <div><dt>Mástil</dt><dd>${esc(m.mastil||"—")}${m.alturaMastil?" · "+m.alturaMastil+" mm":""}</dd></div>
+      <div><dt>Horas contador</dt><dd>${fmtH(m.horas)}${m.horasFecha?`<div class="note">leídas el ${fmtD(m.horasFecha)}</div>`:""}</dd></div>
+      <div><dt>Plan de revisión</dt><dd>${[m.revisionCadaH?"cada "+fmtH(m.revisionCadaH):"",m.revisionCadaMeses?"cada "+m.revisionCadaMeses+" meses":""].filter(Boolean).join(" o ")||"Sin plan"}${m.ultimaRevisionFecha?`<div class="note">última: ${fmtD(m.ultimaRevisionFecha)}${m.ultimaRevisionH!=null?" a "+fmtH(m.ultimaRevisionH):""}</div>`:""}</dd></div>
+      <div><dt>Próxima revisión</dt><dd>${m.proximaRevisionFecha?fmtD(m.proximaRevisionFecha)+" · ":""}${m.proximaRevisionH?fmtH(m.proximaRevisionH)+(m.horas!=null&&m.horas!==""?`<div class="note">${Number(m.proximaRevisionH)-Number(m.horas)>0?"faltan "+fmtH(Number(m.proximaRevisionH)-Number(m.horas)):"vencida"}</div>`:""):(m.proximaRevisionFecha?"":"Sin fijar")}</dd></div>
+      <div><dt>Ruedas</dt><dd>${m.ruedas||"—"}</dd></div>
+      <div><dt>Ubicación</dt><dd>${esc(m.ubicacion||"—")}</dd></div>
+      <div><dt>Coste</dt><dd>${eur(m.coste)}</dd></div>
+      <div><dt>PVP</dt><dd>${eur(m.pvp)}</dd></div>
+      <div style="grid-column:1/-1"><dt>Póliza de seguro</dt><dd class="mono">${esc(m.poliza||"Sin póliza")}</dd></div>
+      ${m.notas?`<div style="grid-column:1/-1"><dt>Notas</dt><dd>${esc(m.notas)}</dd></div>`:""}
+    </dl></div>
+    <div class="box"><h3>Historial</h3>${h.length?`<ul class="hist">${h.map(x=>`<li><time>${fmtD(x.fecha)}</time><div><span class="t">${esc(x.tipo)}</span>${x.cliente?" · "+esc(x.cliente):""}${x.porEmail?` <span class="note">· ${esc(x.porEmail.split("@")[0])}</span>`:""}${x.detalle?`<div class="note">${esc(x.detalle)}</div>`:""}</div></li>`).join("")}</ul>`:`<p class="note">Sin movimientos todavía. Cada alquiler, recogida, avería o reparación que anotes quedará aquí.</p>`}</div>`;
+  }
+  $("#sheetRoot").innerHTML=`<div class="scrim" data-close></div><aside class="sheet" role="dialog" aria-modal="true" aria-label="Ficha de máquina">
+    <div class="sheet-h"><span class="code ${isNew||m.codigo?"":"none"}">${isNew?"Nueva":esc(label(m))}</span>${isNew?"":`<div><div class="model">${esc(m.marca)} ${esc(m.modelo)}</div><span class="pill s-${m.situacion}">${ST[m.situacion]?.l||""}</span></div>`}
+    <button class="btn ghost x" data-close aria-label="Cerrar">✕</button></div>
+    <div class="sheet-b">${body}</div></aside>
+    <datalist id="locs">${locs.map(l=>`<option value="${esc(l)}">`).join("")}</datalist>`;
+}
+
+/* ---------- base de datos (Supabase) ---------- */
+const toSnake=k=>k.replace(/[A-Z]/g,c=>"_"+c.toLowerCase());
+const toCamel=k=>k.replace(/_([a-z])/g,(_,c)=>c.toUpperCase());
+function out(o){const r={};for(const[k,v]of Object.entries(o))r[toSnake(k)]=v===""?null:v;return r}
+function inn(o){const r={};for(const[k,v]of Object.entries(o))r[toCamel(k)]=v;return r}
+async function chk(p){const {data,error}=await p;if(error){console.error(error);throw error}return data}
+const maq={
+  update:(id,o)=>chk(sb.from("maquinas").update(out(o)).eq("id",id)),
+  add:async o=>(await chk(sb.from("maquinas").insert(out(o)).select("id").single())),
+  del:id=>chk(sb.from("maquinas").delete().eq("id",id))
+};
+async function loadAll(){
+  const [m,v]=await Promise.all([chk(sb.from("maquinas").select("*")),chk(sb.from("movimientos").select("*"))]);
+  machines=m.map(inn);moves=v.map(inn);render();
+}
+let reloadT=null;
+function scheduleReload(){clearTimeout(reloadT);reloadT=setTimeout(()=>loadAll().catch(()=>{}),250)}
+
+/* ---------- escrituras ---------- */
+async function addMove(id,o){
+  await chk(sb.from("movimientos").insert(out({maquina:id,fecha:o.fecha||today(),tipo:o.tipo,detalle:o.detalle||"",cliente:o.cliente||"",porEmail:me?.email||"",...(o.extra||{})})));
+  scheduleReload();
+}
+const num=v=>v===""||v==null?null:Number(v);
+async function submit(form){
+  const act=form.dataset.act, d=Object.fromEntries(new FormData(form)), id=openId;
+  const ref=id==="__new"?null:{update:o=>maq.update(id,o).then(scheduleReload)};
+  const m=machines.find(x=>x.id===id)||{};
+  const H=num(d.horas);
+  if(H!=null&&m.horas!=null&&m.horas!==""&&H<Number(m.horas)&&act!=="editar"){toast(`Las horas no pueden bajar: la última lectura es ${fmtH(m.horas)}`);return}
+  const hrs=H==null?{}:{horas:H,horasFecha:d.fecha||d.inicio||today()};
+  form.querySelectorAll("button").forEach(b=>b.disabled=true);
+  try{
+    if(act==="editar"){
+      const o={};F.forEach(([k,,t])=>{o[k]=t==="number"?num(d[k]):(d[k]||"").trim()});
+      if(o.codigo)o.codigo=o.codigo.toLowerCase();
+      if(id==="__new"){const r=await maq.add(o);await addMove(r.id,{tipo:"Alta en la flota"});openId=r.id}
+      else{await ref.update(o);if(m.situacion!==o.situacion)await addMove(id,{tipo:"Cambio de situación",detalle:`${ST[m.situacion]?.l} → ${ST[o.situacion]?.l}`})}
+      toast("Datos guardados");
+    }else if(act==="alquilar"){
+      const cli=d.cliente.trim();
+      await ref.update({situacion:"alquilada",ubicacion:cli,alquiler:{inicio:d.inicio,fin:d.fin||"",precioMes:num(d.precioMes),horasInicio:H??(m.horas===""?null:m.horas??null)},...hrs});
+      await addMove(id,{tipo:"Alquiler",fecha:d.inicio,cliente:cli,detalle:[d.fin?"Fin previsto "+fmtD(d.fin):"",d.precioMes?eur(d.precioMes)+"/mes":"",H!=null?"Sale con "+fmtH(H):"",d.detalle].filter(Boolean).join(" · ")});
+      toast("Alquiler guardado");
+    }else if(act==="devolver"){
+      const hi=m.alquiler?.horasInicio, uso=H!=null&&hi!=null&&hi!==""?H-Number(hi):null;
+      await ref.update({situacion:d.estado,ubicacion:d.nave,alquiler:null,...hrs});
+      await addMove(id,{tipo:"Recogida",fecha:d.fecha,cliente:m.ubicacion,detalle:[`A ${d.nave}`,d.estado==="averiada"?"llega averiada":"",H!=null?"Vuelve con "+fmtH(H):"",uso!=null?fmtH(uso)+" de uso":"",d.detalle].filter(Boolean).join(" · ")});
+      toast("Recogida guardada");
+    }else if(act==="averia"){
+      await ref.update({situacion:"averiada"});await addMove(id,{tipo:"Avería",fecha:d.fecha,detalle:d.detalle,cliente:m.situacion==="alquilada"?m.ubicacion:""});toast("Avería anotada");
+    }else if(act==="taller"){
+      await ref.update({situacion:"taller"});await addMove(id,{tipo:"Enviada a taller",fecha:d.fecha,detalle:[d.taller,d.detalle].filter(Boolean).join(" · ")});toast("Enviada a taller");
+    }else if(act==="reparada"){
+      await ref.update({situacion:"disponible",ubicacion:d.nave,...hrs});
+      await addMove(id,{tipo:"Reparada",fecha:d.fecha,detalle:[d.coste?eur(d.coste):"",d.detalle].filter(Boolean).join(" · "),extra:{coste:num(d.coste),horas:H}});toast("Lista para alquilar");
+    }else if(act==="revision"){
+      const ch=num(d.cadaH),cm=num(d.cadaM),hNow=H??(m.horas===""?null:m.horas??null);
+      const up={...hrs,revisionCadaH:ch,revisionCadaMeses:cm,ultimaRevisionFecha:d.fecha,ultimaRevisionH:hNow,
+        proximaRevisionH:ch&&hNow!=null?Number(hNow)+ch:null,proximaRevisionFecha:cm?addMonths(d.fecha,cm):""};
+      await ref.update(up);
+      await addMove(id,{tipo:"Revisión",fecha:d.fecha,detalle:[hNow!=null?"A "+fmtH(hNow):"",d.taller,d.coste?eur(d.coste):"",d.detalle,
+        [up.proximaRevisionH?fmtH(up.proximaRevisionH):"",up.proximaRevisionFecha?fmtD(up.proximaRevisionFecha):""].filter(Boolean).length?"Próxima: "+[up.proximaRevisionH?fmtH(up.proximaRevisionH):"",up.proximaRevisionFecha?fmtD(up.proximaRevisionFecha):""].filter(Boolean).join(" o "):""].filter(Boolean).join(" · "),extra:{horas:hNow,coste:num(d.coste)}});
+      toast("Revisión guardada");
+    }else if(act==="horas"){
+      await ref.update(hrs);await addMove(id,{tipo:"Lectura de horas",fecha:d.fecha,detalle:[fmtH(H),m.horas!=null&&m.horas!==""?"+"+fmtH(H-Number(m.horas))+" desde la anterior":"",d.detalle].filter(Boolean).join(" · "),extra:{horas:H}});toast("Horas guardadas");
+    }else if(act==="nota"){
+      if(H!=null)await ref.update(hrs);
+      await addMove(id,{tipo:d.tipo,fecha:d.fecha,detalle:[H!=null?fmtH(H):"",d.detalle].filter(Boolean).join(" · "),extra:H!=null?{horas:H}:{}});toast("Guardado");
+    }
+    mode="view";renderSheet();
+  }catch(e){
+    form.querySelectorAll("button").forEach(b=>b.disabled=false);
+    if(e&&(e.code==="42501"||e.status===401||e.status===403)){toast("No tienes permiso para cambiar datos. Vuelve a entrar.")}
+    else toast("No se pudo guardar. Revisa la conexión y vuelve a intentarlo.");
+  }
+}
+
+/* ---------- eventos ---------- */
+document.addEventListener("click",async e=>{
+  const t=e.target.closest("[data-tab],[data-st],[data-id],[data-close],[data-mode],[data-cancel],[data-del],#addBtn,#csvBtn");
+  if(!t)return;
+  if(t.dataset.tab){document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-selected",b===t));["maquinas","alquileres","taller","avisos"].forEach(v=>$("#v-"+v).hidden=v!==t.dataset.tab);try{localStorage.setItem("tab",t.dataset.tab)}catch{}return}
+  if(t.dataset.st!==undefined&&t.classList.contains("stat")){filt.st=filt.st===t.dataset.st?"":t.dataset.st;render();return}
+  if(t.dataset.id){openSheet(t.dataset.id);return}
+  if(t.dataset.close!==undefined){closeSheet();return}
+  if(t.dataset.mode){mode=t.dataset.mode;renderSheet();return}
+  if(t.dataset.cancel!==undefined){if(openId==="__new")closeSheet();else{mode="view";renderSheet()}return}
+  if(t.dataset.del!==undefined){
+    if(t.dataset.sure){await maq.del(openId).then(scheduleReload).catch(()=>toast("No se pudo borrar"));closeSheet();toast("Máquina borrada")}
+    else{t.dataset.sure="1";t.textContent="Pulsa otra vez para borrar"}return}
+  if(t.id==="addBtn"){openSheet("__new","edit");return}
+  if(t.id==="csvBtn"){exportCsv();return}
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&openId)closeSheet();if(e.key==="Enter"&&e.target.classList?.contains("issue"))openSheet(e.target.dataset.id)});
+document.addEventListener("submit",e=>{e.preventDefault();submit(e.target)});
+$("#q").addEventListener("input",e=>{filt.q=e.target.value;renderGrid()});
+$("#fComb").addEventListener("change",e=>{filt.comb=e.target.value;renderGrid()});
+$("#fLoc").addEventListener("change",e=>{filt.loc=e.target.value;renderGrid()});
+try{const tb=localStorage.getItem("tab");if(tb&&tb!=="maquinas")setTimeout(()=>document.querySelector(`[data-tab="${tb}"]`)?.click())}catch{}
+
+
+async function exportCsv(){
+  const H=["Nº interno","Marca","Modelo","Nº serie","Combustible","Potencia kW","Año","Coste €","PVP €","Mástil","Altura mm","Ruedas","Situación","Ubicación / cliente","Alquiler desde","Alquiler hasta","€/mes","Horas","Fecha lectura","Próxima revisión (h)","Próxima revisión (fecha)","Póliza","Notas"];
+  const q=v=>{v=v==null?"":String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const rows=machines.slice().sort(cmp).map(m=>[label(m),m.marca,m.modelo,m.serie,m.combustible,String(m.potenciaKw??"").replace(".",","),m.anio,m.coste,m.pvp,m.mastil,m.alturaMastil,m.ruedas,ST[m.situacion]?.l,m.ubicacion,fmtD(m.alquiler?.inicio),fmtD(m.alquiler?.fin),m.alquiler?.precioMes,m.horas,fmtD(m.horasFecha),m.proximaRevisionH,fmtD(m.proximaRevisionFecha),m.poliza,m.notas].map(q).join(";"));
+  const blob=new Blob([String.fromCharCode(0xFEFF)+[H.join(";"),...rows].join("\r\n")],{type:"text/csv;charset=utf-8"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`flota_${today()}.csv`;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+}
+
+/* ---------- arranque ---------- */
+let channel=null;
+async function startApp(session){
+  me=session.user;
+  $("#loginView").hidden=true;$("#appView").hidden=false;$("#whoEmail").textContent=me.email;$("#csvBtn").hidden=false;
+  try{await loadAll()}catch(e){$("#grid").innerHTML=`<div class="empty"><h3>No se pueden cargar los datos</h3>Revisa la conexión a internet y recarga la página.</div>`;return}
+  if(!channel)channel=sb.channel("flota").on("postgres_changes",{event:"*",schema:"public",table:"maquinas"},scheduleReload)
+    .on("postgres_changes",{event:"*",schema:"public",table:"movimientos"},scheduleReload).subscribe();
+}
+function showLogin(){me=null;$("#appView").hidden=true;$("#loginView").hidden=false;closeSheet()}
+$("#loginForm").addEventListener("submit",async e=>{
+  e.preventDefault();e.stopPropagation();$("#lg_err").textContent="";
+  const {error}=await sb.auth.signInWithPassword({email:$("#lg_email").value.trim(),password:$("#lg_pass").value});
+  if(error)$("#lg_err").textContent=/invalid/i.test(error.message)?"Correo o contraseña incorrectos.":"No se pudo entrar: "+error.message;
+},true);
+$("#outBtn").addEventListener("click",async()=>{await sb.auth.signOut();showLogin()});
+$("#pwBtn").addEventListener("click",()=>{
+  $("#sheetRoot").innerHTML=`<div class="scrim" data-close></div><aside class="sheet" role="dialog" aria-modal="true" aria-label="Cambiar contraseña">
+  <div class="sheet-h"><span class="model">Cambiar contraseña</span><button class="btn ghost x" data-close aria-label="Cerrar">✕</button></div>
+  <div class="sheet-b"><form class="box" id="pwForm"><div class="form"><label class="full" for="pw1">Nueva contraseña (mínimo 8 caracteres)<input id="pw1" type="password" minlength="8" autocomplete="new-password" required></label>
+  <div class="btns"><button class="btn primary">Guardar contraseña</button></div></div></form></div></aside>`;openId=null;
+  $("#pwForm").addEventListener("submit",async e=>{e.preventDefault();e.stopPropagation();const {error}=await sb.auth.updateUser({password:$("#pw1").value});
+    if(error)toast("No se pudo cambiar: "+error.message);else{toast("Contraseña cambiada");$("#sheetRoot").innerHTML=""}},true);
+});
+(async()=>{
+  if(!window.FLOTA_CONFIG||!window.supabase){document.body.innerHTML='<p style="padding:24px">Falta la configuración (config.js).</p>';return}
+  sb=window.supabase.createClient(FLOTA_CONFIG.url,FLOTA_CONFIG.anonKey);
+  const {data:{session}}=await sb.auth.getSession();
+  if(session)startApp(session);else showLogin();
+  sb.auth.onAuthStateChange((ev,ses)=>{if(ev==="SIGNED_IN"&&ses&&!me)startApp(ses);if(ev==="SIGNED_OUT")showLogin()});
+  if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+})();
+</script>
+</body>
+</html>
