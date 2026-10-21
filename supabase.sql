@@ -4,6 +4,8 @@
 create table if not exists public.maquinas (
   id text primary key default gen_random_uuid()::text,
   codigo text,
+  tipo text not null default 'Carretilla',
+  anio_compra int,
   marca text,
   modelo text,
   serie text,
@@ -68,6 +70,8 @@ exception when duplicate_object then null; end $$;
 do $$ begin
   alter publication supabase_realtime add table public.movimientos;
 exception when duplicate_object then null; end $$;
+
+-- Para añadir más máquinas o cambios posteriores, ver la carpeta «actualizaciones».
 
 -- Las 25 máquinas del inventario (21/10/2026).
 insert into public.maquinas (id, codigo, marca, modelo, serie, combustible, potencia_kw, anio, coste, pvp, mastil, altura_mastil, ruedas, situacion, ubicacion, poliza, notas, alquiler) values

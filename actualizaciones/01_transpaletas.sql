@@ -1,0 +1,26 @@
+-- Añade el tipo de máquina, el año de compra y las 16 transpaletas eléctricas HC alquiladas a DICAR.
+-- Pegar entero en Supabase > SQL Editor > New query, y pulsar «Run». Se puede ejecutar más de una vez sin duplicar nada.
+
+alter table public.maquinas add column if not exists tipo text not null default 'Carretilla';
+alter table public.maquinas add column if not exists anio_compra int;
+
+insert into public.maquinas (id, codigo, tipo, anio_compra, marca, modelo, serie, combustible, anio, coste, pvp, mastil, situacion, ubicacion, notas, alquiler) values
+('di-4', 'di-4', 'Transpaleta eléctrica', 2024, 'HC', 'CBD15', '51BC18442', 'Eléctrica', 2023, 1074.15, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea. PVP pendiente (en la hoja: «?????»).', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-5', 'di-5', 'Transpaleta eléctrica', 2024, 'HC', 'CBD15 LITIO', '51BD02633', 'Eléctrica', 2024, 1150, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea.', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-6', 'di-6', 'Transpaleta eléctrica', 2024, 'HC', 'CBD15 LITIO', '51BD02628', 'Eléctrica', 2024, 1150, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea.', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-7', 'di-7', 'Transpaleta eléctrica', 2024, 'HC', 'CBD15 LITIO', '51BD06896', 'Eléctrica', 2024, 1150, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea.', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-8', 'di-8', 'Transpaleta eléctrica', 2024, 'HC', 'CBD15 LITIO', '51BD07120', 'Eléctrica', 2024, 1150, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea.', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-9', 'di-9', 'Transpaleta eléctrica', 2024, 'HC', 'CBD15 LITIO', '51BD07108', 'Eléctrica', 2024, 1050, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea.', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-11', 'di-11', 'Transpaleta eléctrica', 2024, 'HC', 'CBD15 LITIO', '51BD07149', 'Eléctrica', 2024, 1050, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea.', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-12', 'di-12', 'Transpaleta eléctrica', 2024, 'HC', 'CBD15 LITIO', '51BD07150', 'Eléctrica', 2024, 1050, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea.', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-10', 'di-10', 'Transpaleta eléctrica', 2024, 'HC', 'CBD15 LITIO', '51BD09698', 'Eléctrica', 2024, 1050, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea.', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-1', 'di-1', 'Transpaleta eléctrica', 2025, 'HC', 'CBD15-A3MC2-I', '51BE13850', 'Eléctrica', 2025, 1050, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea.', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-2', 'di-2', 'Transpaleta eléctrica', 2025, 'HC', 'CBD15-A3MC2-I', '51BE13849', 'Eléctrica', 2025, 1050, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea.', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-3', 'di-3', 'Transpaleta eléctrica', 2025, 'HC', 'CBD15-A3MC2-I', '51BD27334', 'Eléctrica', 2025, 1050, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea.', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-13', 'di-13', 'Transpaleta eléctrica', 2025, 'HC', 'CBD15-A3MC2-I', '51BD027336', 'Eléctrica', 2025, 1050, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea. Revisar nº de serie: tiene un dígito más que las demás (¿sobra un 0?).', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-14', 'di-14', 'Transpaleta eléctrica', 2025, 'HC', 'CBD15-A3MC2-I', '51BD027340', 'Eléctrica', 2025, 1050, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea. Revisar nº de serie: tiene un dígito más que las demás (¿sobra un 0?).', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-15', 'di-15', 'Transpaleta eléctrica', 2025, 'HC', 'CBD15-A3MC2-I', '51BD027335', 'Eléctrica', 2025, 1050, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea. Revisar nº de serie: tiene un dígito más que las demás (¿sobra un 0?).', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb),
+('di-16', 'di-16', 'Transpaleta eléctrica', 2025, 'HC', 'CBD15-A3MC2-I', '51BE13877', 'Eléctrica', 2025, 1050, null, 'Horquilla europea', 'alquilada', 'DICAR', 'Nueva al alta (sin horas registradas). Horquilla europea.', '{"inicio":null,"fin":null,"precioMes":null}'::jsonb)
+on conflict (id) do nothing;
+
+select tipo, count(*) as maquinas from public.maquinas group by tipo;

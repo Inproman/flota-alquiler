@@ -178,6 +178,7 @@ dl.kv dd.mono{font-family:var(--f-mono);font-size:13px}
     <div class="stats" id="stats"></div>
     <div class="toolbar">
       <input type="search" id="q" placeholder="Buscar nº, modelo, serie, cliente…" aria-label="Buscar">
+      <select id="fTipo" aria-label="Tipo de máquina"><option value="">Todos los tipos</option><option>Carretilla</option><option>Transpaleta eléctrica</option></select>
       <select id="fComb" aria-label="Combustible"><option value="">Eléctricas y diésel</option><option>Eléctrica</option><option>Diésel</option></select>
       <select id="fLoc" aria-label="Ubicación"><option value="">Todas las ubicaciones</option></select>
       <button class="btn primary" id="addBtn">+ Añadir máquina</button>
@@ -203,7 +204,7 @@ const ST = {
   vendida:{l:"Vendida",c:"var(--muted)"}
 };
 const NAVES = ["NAVE 1","NAVE 2"];
-let sb=null, me=null, db=true, canWrite=true, machines=[], moves=[], filt={st:"",q:"",comb:"",loc:""}, openId=null, mode="view";
+let sb=null, me=null, db=true, canWrite=true, machines=[], moves=[], filt={st:"",q:"",comb:"",loc:"",tipo:""}, openId=null, mode="view";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const today=()=>new Date().toISOString().slice(0,10);
@@ -260,7 +261,7 @@ function cmp(a,b){const x=sortKey(a),y=sortKey(b);for(let i=0;i<x.length;i++){if
 const QUIET=["Sin plan de revisiones","Sin horas anotadas"];
 function renderGrid(){
   const q=filt.q.trim().toLowerCase();
-  const list=machines.filter(m=>(!filt.st||m.situacion===filt.st)&&(!filt.comb||m.combustible===filt.comb)&&(!filt.loc||m.ubicacion===filt.loc)&&
+  const list=machines.filter(m=>(!filt.st||m.situacion===filt.st)&&(!filt.comb||m.combustible===filt.comb)&&(!filt.tipo||(m.tipo||"Carretilla")===filt.tipo)&&(!filt.loc||m.ubicacion===filt.loc)&&
     (!q||[m.codigo,m.marca,m.modelo,m.serie,m.ubicacion,m.poliza,m.notas].join(" ").toLowerCase().includes(q))).sort(cmp);
   if(!db){return}
   if(!machines.length){$("#grid").innerHTML=`<div class="empty"><h3>Aún no hay máquinas</h3>Pulsa «Añadir máquina» para dar de alta la primera.</div>`;return}
@@ -271,7 +272,7 @@ function renderGrid(){
     return `<button class="card" data-id="${m.id}">
       <div class="row1"><span class="code ${m.codigo?"":"none"}">${esc(label(m))}</span><span class="pill s-${m.situacion}">${ST[m.situacion]?.l||esc(m.situacion)}</span></div>
       <div><div class="model">${esc(m.marca)} ${esc(m.modelo)}</div><div class="serial">${m.serie?"S/N "+esc(m.serie):"Sin nº de serie"}</div></div>
-      <div class="meta"><span>${esc(m.combustible)}</span><span>${m.potenciaKw?String(m.potenciaKw).replace(".",",")+" kW":""}</span><span>${m.anio||"Año ¿?"}</span><span>${m.alturaMastil?m.alturaMastil+" mm":esc(m.mastil)}</span>${m.horas!=null&&m.horas!==""?`<span><b style="color:var(--fg)">${fmtH(m.horas)}</b></span>`:""}</div>
+      <div class="meta">${m.tipo&&m.tipo!=="Carretilla"?`<span><b style="color:var(--fg)">${esc(m.tipo)}</b></span>`:""}<span>${esc(m.combustible)}</span><span>${m.potenciaKw?String(m.potenciaKw).replace(".",",")+" kW":""}</span><span>${m.anio||"Año ¿?"}</span><span>${m.alturaMastil?m.alturaMastil+" mm":esc(m.mastil)}</span>${m.horas!=null&&m.horas!==""?`<span><b style="color:var(--fg)">${fmtH(m.horas)}</b></span>`:""}</div>
       <div class="where">${inNave?shed:pin}<span>${esc(m.ubicacion||"—")}${esc(fin)}</span></div>
       ${(iss=iss.filter(i=>!QUIET.includes(i.k))).length?`<div class="flags">${iss.map(i=>`<span class="flag ${i.h?"":"soft"}">${esc(i.k)}</span>`).join("")}</div>`:""}
     </button>`}).join("");
@@ -327,17 +328,18 @@ function renderIssues(){
 /* ---------- ficha ---------- */
 function openSheet(id,m0){openId=id;mode=m0||"view";renderSheet()}
 function closeSheet(){openId=null;$("#sheetRoot").innerHTML=""}
-const F=[["codigo","Nº interno","text"],["situacion","Situación","st"],["marca","Marca","text"],["modelo","Modelo","text"],["serie","Nº de serie","text"],["combustible","Combustible","comb"],["potenciaKw","Potencia (kW)","number"],["anio","Año","number"],["coste","Coste (€)","number"],["pvp","PVP (€)","number"],["mastil","Mástil","text"],["alturaMastil","Altura mástil (mm)","number"],["ruedas","Nº ruedas","number"],["horas","Horas contador","number"],["revisionCadaH","Revisión cada (h)","number"],["revisionCadaMeses","Revisión cada (meses)","number"],["proximaRevisionH","Próxima revisión a (h)","number"],["proximaRevisionFecha","Próxima revisión (fecha)","date"],["ubicacion","Ubicación / cliente","text"],["poliza","Póliza de seguro","text"],["notas","Notas","area"]];
+const F=[["codigo","Nº interno","text"],["situacion","Situación","st"],["tipo","Tipo de máquina","tipo"],["anioCompra","Año de compra","number"],["marca","Marca","text"],["modelo","Modelo","text"],["serie","Nº de serie","text"],["combustible","Combustible","comb"],["potenciaKw","Potencia (kW)","number"],["anio","Año","number"],["coste","Coste (€)","number"],["pvp","PVP (€)","number"],["mastil","Mástil","text"],["alturaMastil","Altura mástil (mm)","number"],["ruedas","Nº ruedas","number"],["horas","Horas contador","number"],["revisionCadaH","Revisión cada (h)","number"],["revisionCadaMeses","Revisión cada (meses)","number"],["proximaRevisionH","Próxima revisión a (h)","number"],["proximaRevisionFecha","Próxima revisión (fecha)","date"],["ubicacion","Ubicación / cliente","text"],["poliza","Póliza de seguro","text"],["notas","Notas","area"]];
 function field([k,l,t],v){
   const id="f_"+k;
   if(t==="st")return `<label for="${id}">${l}<select id="${id}" name="${k}">${Object.entries(ST).map(([s,o])=>`<option value="${s}" ${v===s?"selected":""}>${o.l}</option>`).join("")}</select></label>`;
+  if(t==="tipo")return `<label for="${id}">${l}<select id="${id}" name="${k}">${["Carretilla","Transpaleta eléctrica","Apilador","Plataforma elevadora","Otra"].map(s=>`<option ${(v||"Carretilla")===s?"selected":""}>${s}</option>`).join("")}</select></label>`;
   if(t==="comb")return `<label for="${id}">${l}<select id="${id}" name="${k}">${["Eléctrica","Diésel","Gas (GLP)"].map(s=>`<option ${v===s?"selected":""}>${s}</option>`).join("")}</select></label>`;
   if(t==="area")return `<label class="full" for="${id}">${l}<textarea id="${id}" name="${k}" rows="2">${esc(v)}</textarea></label>`;
   return `<label for="${id}">${l}<input id="${id}" name="${k}" type="${t}" ${t==="number"?'step="any" inputmode="decimal"':""} value="${esc(v??"")}" ${k==="ubicacion"?'list="locs"':""}></label>`;
 }
 function renderSheet(){
   const isNew=openId==="__new";
-  const m=isNew?{situacion:"disponible",combustible:"Eléctrica",ubicacion:"NAVE 1"}:machines.find(x=>x.id===openId);
+  const m=isNew?{situacion:"disponible",combustible:"Eléctrica",ubicacion:"NAVE 1",tipo:"Carretilla"}:machines.find(x=>x.id===openId);
   if(!m){closeSheet();return}
   const h=moves.filter(x=>x.maquina===openId).sort((a,b)=>(b.fecha+b.creado).localeCompare(a.fecha+a.creado));
   const locs=[...new Set(machines.map(x=>x.ubicacion).filter(Boolean))];
@@ -416,6 +418,8 @@ function renderSheet(){
       <div><dt>Horas al salir</dt><dd>${fmtH(a.horasInicio)}</dd></div><div><dt>Horas en este alquiler</dt><dd>${a.horasInicio!=null&&m.horas!=null?fmtH(Number(m.horas)-Number(a.horasInicio)):"—"}</dd></div>
       <div><dt>Desde</dt><dd>${fmtD(a.inicio)}</dd></div><div><dt>Hasta</dt><dd>${fmtD(a.fin)}${a.fin&&daysTo(a.fin)<0?' <span class="flag">Vencido</span>':""}</dd></div></dl></div>`:""}
     <div class="box"><h3>Datos de la máquina</h3><dl class="kv">
+      <div><dt>Tipo</dt><dd>${esc(m.tipo||"Carretilla")}</dd></div>
+      <div><dt>Año de compra</dt><dd>${m.anioCompra||"—"}</dd></div>
       <div><dt>Marca y modelo</dt><dd>${esc(m.marca)} ${esc(m.modelo)}</dd></div>
       <div><dt>Nº de serie</dt><dd class="mono">${esc(m.serie||"—")}</dd></div>
       <div><dt>Combustible</dt><dd>${esc(m.combustible)}</dd></div>
@@ -538,15 +542,16 @@ document.addEventListener("click",async e=>{
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&openId)closeSheet();if(e.key==="Enter"&&e.target.classList?.contains("issue"))openSheet(e.target.dataset.id)});
 document.addEventListener("submit",e=>{e.preventDefault();submit(e.target)});
 $("#q").addEventListener("input",e=>{filt.q=e.target.value;renderGrid()});
+$("#fTipo").addEventListener("change",e=>{filt.tipo=e.target.value;renderGrid()});
 $("#fComb").addEventListener("change",e=>{filt.comb=e.target.value;renderGrid()});
 $("#fLoc").addEventListener("change",e=>{filt.loc=e.target.value;renderGrid()});
 try{const tb=localStorage.getItem("tab");if(tb&&tb!=="maquinas")setTimeout(()=>document.querySelector(`[data-tab="${tb}"]`)?.click())}catch{}
 
 
 async function exportCsv(){
-  const H=["Nº interno","Marca","Modelo","Nº serie","Combustible","Potencia kW","Año","Coste €","PVP €","Mástil","Altura mm","Ruedas","Situación","Ubicación / cliente","Alquiler desde","Alquiler hasta","€/mes","Horas","Fecha lectura","Próxima revisión (h)","Próxima revisión (fecha)","Póliza","Notas"];
+  const H=["Nº interno","Tipo","Año compra","Marca","Modelo","Nº serie","Combustible","Potencia kW","Año","Coste €","PVP €","Mástil","Altura mm","Ruedas","Situación","Ubicación / cliente","Alquiler desde","Alquiler hasta","€/mes","Horas","Fecha lectura","Próxima revisión (h)","Próxima revisión (fecha)","Póliza","Notas"];
   const q=v=>{v=v==null?"":String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-  const rows=machines.slice().sort(cmp).map(m=>[label(m),m.marca,m.modelo,m.serie,m.combustible,String(m.potenciaKw??"").replace(".",","),m.anio,m.coste,m.pvp,m.mastil,m.alturaMastil,m.ruedas,ST[m.situacion]?.l,m.ubicacion,fmtD(m.alquiler?.inicio),fmtD(m.alquiler?.fin),m.alquiler?.precioMes,m.horas,fmtD(m.horasFecha),m.proximaRevisionH,fmtD(m.proximaRevisionFecha),m.poliza,m.notas].map(q).join(";"));
+  const rows=machines.slice().sort(cmp).map(m=>[label(m),m.tipo||"Carretilla",m.anioCompra,m.marca,m.modelo,m.serie,m.combustible,String(m.potenciaKw??"").replace(".",","),m.anio,m.coste,m.pvp,m.mastil,m.alturaMastil,m.ruedas,ST[m.situacion]?.l,m.ubicacion,fmtD(m.alquiler?.inicio),fmtD(m.alquiler?.fin),m.alquiler?.precioMes,m.horas,fmtD(m.horasFecha),m.proximaRevisionH,fmtD(m.proximaRevisionFecha),m.poliza,m.notas].map(q).join(";"));
   const blob=new Blob([String.fromCharCode(0xFEFF)+[H.join(";"),...rows].join("\r\n")],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`flota_${today()}.csv`;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
 }
