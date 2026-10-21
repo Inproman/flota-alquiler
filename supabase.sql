@@ -31,6 +31,10 @@ create table if not exists public.maquinas (
   ultima_revision_h numeric,
   proxima_revision_h numeric,
   proxima_revision_fecha date,
+  foto text,
+  cert_ce text,
+  cert_seguro text,
+  seguro_caduca date,
   actualizado timestamptz not null default now()
 );
 
@@ -71,7 +75,8 @@ do $$ begin
   alter publication supabase_realtime add table public.movimientos;
 exception when duplicate_object then null; end $$;
 
--- Para añadir más máquinas o cambios posteriores, ver la carpeta «actualizaciones».
+-- Instalación nueva: después de este script, ejecutar también los de la carpeta «actualizaciones» en orden
+-- (crean la carpeta de documentos y añaden las transpaletas).
 
 -- Las 25 máquinas del inventario (21/10/2026).
 insert into public.maquinas (id, codigo, marca, modelo, serie, combustible, potencia_kw, anio, coste, pvp, mastil, altura_mastil, ruedas, situacion, ubicacion, poliza, notas, alquiler) values

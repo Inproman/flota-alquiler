@@ -139,6 +139,15 @@ dl.kv dd.mono{font-family:var(--f-mono);font-size:13px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;z-index:30;font-weight:500}
 .banner{background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;padding:10px 14px;margin-top:14px;font-size:14px}
 @media (prefers-reduced-motion:no-preference){.sheet{animation:slide .18s ease-out}@keyframes slide{from{transform:translateX(30px);opacity:.6}}}
+.docs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.doc{display:grid;gap:8px;align-content:start;min-width:0}
+.doc .dt{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.doc label.btn{text-align:center}
+.doc label.cad{display:grid;gap:4px;font-size:12px;color:var(--muted)}
+.photo{width:100%;max-height:260px;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:var(--sunk)}
+.thumb{width:52px;height:52px;object-fit:cover;border-radius:6px;border:1px solid var(--line);flex:none}
+.mrow{display:flex;gap:10px;align-items:center;min-width:0}
+@media (max-width:640px){.docs{grid-template-columns:minmax(0,1fr)}}
 .who{display:flex;align-items:center;gap:8px;font-size:13px;opacity:.85}
 .who button{background:transparent;color:var(--bg);border:1px solid color-mix(in srgb,var(--bg) 40%,transparent);border-radius:6px;padding:4px 8px;font:inherit;cursor:pointer}
 .login{min-height:80vh;display:grid;place-items:center}
@@ -209,7 +218,12 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const today=()=>new Date().toISOString().slice(0,10);
 const fmtD=d=>d?d.slice(8,10)+"/"+d.slice(5,7)+"/"+d.slice(0,4):"—";
-const eur=n=>n==null||n===""?"—":Number(n).toLocaleString("es-ES")+" €";
+const eur=n=>n==null||n===""||isNaN(n)?"—":Number(n).toLocaleString("es-ES",{maximumFractionDigits:2})+" €";
+const TAR={mes:"al mes",semana:"a la semana",dia:"al día",total:"precio cerrado"};
+function tarifa(a){a=a||{};if(a.tarifa)return{t:a.tarifa,p:a.precio==null||a.precio===""?null:Number(a.precio)};return{t:"mes",p:a.precioMes==null||a.precioMes===""?null:Number(a.precioMes)}}
+function duracion(a){if(!a?.inicio)return null;const f=a.fin||today();return Math.max(1,Math.round((new Date(f+"T12:00")-new Date(a.inicio+"T12:00"))/864e5)+1)}
+function importe(a){const {t,p}=tarifa(a);if(p==null)return null;if(t==="total")return p;const d=duracion(a);if(d==null)return null;return p*(t==="dia"?d:t==="semana"?d/7:d/30)}
+const fmtTar=a=>{const {t,p}=tarifa(a);return p==null?"—":t==="total"?eur(p)+" cerrado":eur(p)+" "+TAR[t]};
 const addMonths=(d,n)=>{const x=new Date(d+"T12:00");x.setMonth(x.getMonth()+Number(n));return x.toISOString().slice(0,10)};
 const fmtH=n=>n==null||n===""?"—":Number(n).toLocaleString("es-ES")+" h";
 const daysTo=d=>Math.round((new Date(d+"T12:00")-new Date(today()+"T12:00"))/864e5);
@@ -233,6 +247,8 @@ function issuesOf(m){
   if(m.proximaRevisionFecha){const dd=daysTo(m.proximaRevisionFecha);
     if(dd<0) out.push({k:"Revisión vencida por fecha",h:1}); else if(dd<=30) out.push({k:"Revisión en menos de 30 días",h:0});}
   if(!m.proximaRevisionH&&!m.proximaRevisionFecha) out.push({k:"Sin plan de revisiones",h:0});
+  if(m.seguroCaduca){const dd=daysTo(m.seguroCaduca);
+    if(dd<0) out.push({k:"Seguro caducado",h:1}); else if(dd<=30) out.push({k:"Seguro caduca en menos de 30 días",h:0});}
   if(m.situacion==="alquilada"&&!m.alquiler?.inicio) out.push({k:"Alquiler sin fecha de inicio",h:0});
   return out;
 }
@@ -262,7 +278,7 @@ const QUIET=["Sin plan de revisiones","Sin horas anotadas"];
 function renderGrid(){
   const q=filt.q.trim().toLowerCase();
   const list=machines.filter(m=>(!filt.st||m.situacion===filt.st)&&(!filt.comb||m.combustible===filt.comb)&&(!filt.tipo||(m.tipo||"Carretilla")===filt.tipo)&&(!filt.loc||m.ubicacion===filt.loc)&&
-    (!q||[m.codigo,m.marca,m.modelo,m.serie,m.ubicacion,m.poliza,m.notas].join(" ").toLowerCase().includes(q))).sort(cmp);
+    (!q||[m.codigo,m.marca,m.modelo,m.serie,m.ubicacion,m.alquiler?.obra,m.poliza,m.notas].join(" ").toLowerCase().includes(q))).sort(cmp);
   if(!db){return}
   if(!machines.length){$("#grid").innerHTML=`<div class="empty"><h3>Aún no hay máquinas</h3>Pulsa «Añadir máquina» para dar de alta la primera.</div>`;return}
   if(!list.length){$("#grid").innerHTML=`<div class="empty"><h3>Ninguna máquina coincide</h3>Prueba a quitar algún filtro.</div>`;return}
@@ -271,22 +287,23 @@ function renderGrid(){
     const fin=m.situacion==="alquilada"&&m.alquiler?.fin?` · hasta ${fmtD(m.alquiler.fin)}`:"";
     return `<button class="card" data-id="${m.id}">
       <div class="row1"><span class="code ${m.codigo?"":"none"}">${esc(label(m))}</span><span class="pill s-${m.situacion}">${ST[m.situacion]?.l||esc(m.situacion)}</span></div>
-      <div><div class="model">${esc(m.marca)} ${esc(m.modelo)}</div><div class="serial">${m.serie?"S/N "+esc(m.serie):"Sin nº de serie"}</div></div>
+      <div class="mrow">${m.foto&&U(m.foto)?`<img class="thumb" src="${U(m.foto)}" alt="">`:""}<div style="min-width:0"><div class="model">${esc(m.marca)} ${esc(m.modelo)}</div><div class="serial">${m.serie?"S/N "+esc(m.serie):"Sin nº de serie"}</div></div></div>
       <div class="meta">${m.tipo&&m.tipo!=="Carretilla"?`<span><b style="color:var(--fg)">${esc(m.tipo)}</b></span>`:""}<span>${esc(m.combustible)}</span><span>${m.potenciaKw?String(m.potenciaKw).replace(".",",")+" kW":""}</span><span>${m.anio||"Año ¿?"}</span><span>${m.alturaMastil?m.alturaMastil+" mm":esc(m.mastil)}</span>${m.horas!=null&&m.horas!==""?`<span><b style="color:var(--fg)">${fmtH(m.horas)}</b></span>`:""}</div>
-      <div class="where">${inNave?shed:pin}<span>${esc(m.ubicacion||"—")}${esc(fin)}</span></div>
+      <div class="where">${inNave?shed:pin}<span>${esc(m.ubicacion||"—")}${m.situacion==="alquilada"&&m.alquiler?.obra?" · "+esc(m.alquiler.obra):""}${esc(fin)}</span></div>
       ${(iss=iss.filter(i=>!QUIET.includes(i.k))).length?`<div class="flags">${iss.map(i=>`<span class="flag ${i.h?"":"soft"}">${esc(i.k)}</span>`).join("")}</div>`:""}
     </button>`}).join("");
 }
 function renderRentals(){
-  const r=machines.filter(m=>m.situacion==="alquilada").sort((a,b)=>(a.alquiler?.fin||"9").localeCompare(b.alquiler?.fin||"9"));
+  const r=machines.filter(m=>m.situacion==="alquilada").sort((a,b)=>(a.ubicacion||"").localeCompare(b.ubicacion||"")||(a.alquiler?.obra||"").localeCompare(b.alquiler?.obra||"")||(a.alquiler?.fin||"9").localeCompare(b.alquiler?.fin||"9"));
   $("#nRent").textContent=r.length;
-  const sumMes=r.reduce((s,m)=>s+(Number(m.alquiler?.precioMes)||0),0);
+  const mens=r.filter(m=>tarifa(m.alquiler).t==="mes").reduce((s,m)=>s+(tarifa(m.alquiler).p||0),0);
+  const otros=r.filter(m=>tarifa(m.alquiler).t!=="mes").reduce((s,m)=>s+(importe(m.alquiler)||0),0);
   const byCli={};r.forEach(m=>{(byCli[m.ubicacion]=byCli[m.ubicacion]||[]).push(m)});
   $("#v-alquileres").innerHTML=`<h2 class="sec">Máquinas en clientes</h2>
-  <p class="note">${r.length} alquiladas a ${Object.keys(byCli).length} clientes${sumMes?` · ${eur(sumMes)} al mes en contratos con precio`:""}. Pulsa una fila para ver la máquina.</p>
-  <div class="tablebox"><table><thead><tr><th>Nº</th><th>Máquina</th><th>Cliente</th><th>Desde</th><th>Hasta</th><th>Quedan</th><th>€/mes</th><th>Horas</th><th>h en alquiler</th></tr></thead><tbody>
-  ${r.map(m=>{const a=m.alquiler||{},d=a.fin?daysTo(a.fin):null;
-    return `<tr class="click" data-id="${m.id}"><td><b>${esc(label(m))}</b></td><td>${esc(m.marca)} ${esc(m.modelo)}</td><td>${esc(m.ubicacion)}</td><td>${fmtD(a.inicio)}</td><td>${fmtD(a.fin)}</td><td class="${d!=null&&d<0?"late":""}">${d==null?"Sin fecha":d<0?`Vencido hace ${-d} d`:`${d} d`}</td><td>${eur(a.precioMes)}</td><td>${fmtH(m.horas)}</td><td>${a.horasInicio!=null&&m.horas!=null&&m.horas!==""?fmtH(Number(m.horas)-Number(a.horasInicio)):"—"}</td></tr>`}).join("")||`<tr><td colspan="9">No hay máquinas alquiladas.</td></tr>`}
+  <p class="note">${r.length} alquiladas a ${Object.keys(byCli).length} clientes${mens?` · ${eur(mens)} al mes en tarifas mensuales`:""}${otros?` · ${eur(otros)} estimados en alquileres por días, semanas o precio cerrado`:""}. Pulsa una fila para ver o corregir el alquiler.</p>
+  <div class="tablebox"><table><thead><tr><th>Nº</th><th>Máquina</th><th>Cliente</th><th>Ubicación / obra</th><th>Desde</th><th>Hasta</th><th>Quedan</th><th>Tarifa</th><th>Importe est.</th><th>Horas</th><th>h en alquiler</th></tr></thead><tbody>
+  ${r.map(m=>{const a=m.alquiler||{},d=a.fin?daysTo(a.fin):null,t=tarifa(a).t;
+    return `<tr class="click" data-id="${m.id}"><td><b>${esc(label(m))}</b></td><td>${esc(m.marca)} ${esc(m.modelo)}</td><td>${esc(m.ubicacion)}</td><td>${esc(a.obra||"—")}</td><td>${fmtD(a.inicio)}</td><td>${fmtD(a.fin)}</td><td class="${d!=null&&d<0?"late":""}">${d==null?"Sin fecha":d<0?`Vencido hace ${-d} d`:`${d} d`}</td><td>${fmtTar(a)}</td><td>${t==="mes"?"—":eur(importe(a))}</td><td>${fmtH(m.horas)}</td><td>${a.horasInicio!=null&&m.horas!=null&&m.horas!==""?fmtH(Number(m.horas)-Number(a.horasInicio)):"—"}</td></tr>`}).join("")||`<tr><td colspan="11">No hay máquinas alquiladas.</td></tr>`}
   </tbody></table></div>`;
 }
 const AV=["Avería","Enviada a taller","Reparada"];
@@ -328,7 +345,7 @@ function renderIssues(){
 /* ---------- ficha ---------- */
 function openSheet(id,m0){openId=id;mode=m0||"view";renderSheet()}
 function closeSheet(){openId=null;$("#sheetRoot").innerHTML=""}
-const F=[["codigo","Nº interno","text"],["situacion","Situación","st"],["tipo","Tipo de máquina","tipo"],["anioCompra","Año de compra","number"],["marca","Marca","text"],["modelo","Modelo","text"],["serie","Nº de serie","text"],["combustible","Combustible","comb"],["potenciaKw","Potencia (kW)","number"],["anio","Año","number"],["coste","Coste (€)","number"],["pvp","PVP (€)","number"],["mastil","Mástil","text"],["alturaMastil","Altura mástil (mm)","number"],["ruedas","Nº ruedas","number"],["horas","Horas contador","number"],["revisionCadaH","Revisión cada (h)","number"],["revisionCadaMeses","Revisión cada (meses)","number"],["proximaRevisionH","Próxima revisión a (h)","number"],["proximaRevisionFecha","Próxima revisión (fecha)","date"],["ubicacion","Ubicación / cliente","text"],["poliza","Póliza de seguro","text"],["notas","Notas","area"]];
+const F=[["codigo","Nº interno","text"],["situacion","Situación","st"],["tipo","Tipo de máquina","tipo"],["anioCompra","Año de compra","number"],["marca","Marca","text"],["modelo","Modelo","text"],["serie","Nº de serie","text"],["combustible","Combustible","comb"],["potenciaKw","Potencia (kW)","number"],["anio","Año","number"],["coste","Coste (€)","number"],["pvp","PVP (€)","number"],["mastil","Mástil","text"],["alturaMastil","Altura mástil (mm)","number"],["ruedas","Nº ruedas","number"],["horas","Horas contador","number"],["revisionCadaH","Revisión cada (h)","number"],["revisionCadaMeses","Revisión cada (meses)","number"],["proximaRevisionH","Próxima revisión a (h)","number"],["proximaRevisionFecha","Próxima revisión (fecha)","date"],["ubicacion","Ubicación / cliente","text"],["poliza","Póliza de seguro","text"],["seguroCaduca","Seguro caduca el","date"],["notas","Notas","area"]];
 function field([k,l,t],v){
   const id="f_"+k;
   if(t==="st")return `<label for="${id}">${l}<select id="${id}" name="${k}">${Object.entries(ST).map(([s,o])=>`<option value="${s}" ${v===s?"selected":""}>${o.l}</option>`).join("")}</select></label>`;
@@ -336,6 +353,29 @@ function field([k,l,t],v){
   if(t==="comb")return `<label for="${id}">${l}<select id="${id}" name="${k}">${["Eléctrica","Diésel","Gas (GLP)"].map(s=>`<option ${v===s?"selected":""}>${s}</option>`).join("")}</select></label>`;
   if(t==="area")return `<label class="full" for="${id}">${l}<textarea id="${id}" name="${k}" rows="2">${esc(v)}</textarea></label>`;
   return `<label for="${id}">${l}<input id="${id}" name="${k}" type="${t}" ${t==="number"?'step="any" inputmode="decimal"':""} value="${esc(v??"")}" ${k==="ubicacion"?'list="locs"':""}></label>`;
+}
+function rentalForm(act,a,cli,m){
+  const t=tarifa(a), ed=act==="editAlq";
+  const obras=[...new Set(machines.map(x=>x.alquiler?.obra).filter(Boolean))];
+  return `<form class="box" data-act="${act}"><h3>${ed?"Corregir alquiler":"Alquilar"}</h3><div class="form">
+      <label class="full" for="a_cli">Cliente<input id="a_cli" name="cliente" required list="locs" placeholder="Nombre del cliente" value="${esc(cli)}"></label>
+      <label class="full" for="a_obra">Ubicación / obra<input id="a_obra" name="obra" list="obras" placeholder="Ej. Polígono Las Salinas, nave 4" value="${esc(a.obra||"")}"></label>
+      <label for="a_ini">Inicio<input id="a_ini" name="inicio" type="date" value="${esc(a.inicio||"")}" required></label>
+      <label for="a_fin">Fin previsto<input id="a_fin" name="fin" type="date" value="${esc(a.fin||"")}"></label>
+      <label for="a_tar">Tarifa<select id="a_tar" name="tarifa">${Object.entries({mes:"Por mes",semana:"Por semana",dia:"Por día",total:"Precio cerrado (total)"}).map(([k,l])=>`<option value="${k}" ${t.t===k?"selected":""}>${l}</option>`).join("")}</select></label>
+      <label for="a_pre">Precio (€)<input id="a_pre" name="precio" type="number" step="any" inputmode="decimal" value="${t.p??""}"></label>
+      ${ed?`<label for="a_hin">Horas al salir<input id="a_hin" name="horasInicio" type="number" inputmode="numeric" value="${esc(a.horasInicio??"")}"></label>`
+          :`<label for="a_hor">Horas contador<input id="a_hor" name="horas" type="number" inputmode="numeric"></label>`}
+      <label class="${ed?"":"full"}" for="a_not">${ed?"Qué se corrige":"Notas"}<input id="a_not" name="detalle" placeholder="${ed?"Ej. faltaba la fecha de fin":"Ej. entrega con batería cargada"}"></label>
+      <p class="note" style="grid-column:1/-1;margin:0" id="a_calc"></p>
+      <div class="btns"><button type="button" class="btn ghost" data-cancel>Cancelar</button><button class="btn primary">${ed?"Guardar cambios":"Guardar alquiler"}</button></div></div>
+      <datalist id="obras">${obras.map(o=>`<option value="${esc(o)}">`).join("")}</datalist></form>`;
+}
+function calcRental(){
+  const f=document.querySelector('form[data-act="alquilar"],form[data-act="editAlq"]');if(!f)return;
+  const a={inicio:f.inicio.value,fin:f.fin.value,tarifa:f.tarifa.value,precio:f.precio.value};
+  const im=importe(a),d=duracion(a);
+  $("#a_calc").textContent=a.precio===""?"":a.tarifa==="total"?`Importe total: ${eur(a.precio)}${d?` (${d} días)`:""}`:a.tarifa==="mes"&&!a.fin?"":`Importe estimado: ${eur(im)}${d?` por ${d} días${a.fin?"":" hasta hoy"}`:""}`;
 }
 function renderSheet(){
   const isNew=openId==="__new";
@@ -346,14 +386,8 @@ function renderSheet(){
   let body="";
   const naveSel=(id)=>`<label for="${id}">Nave<select id="${id}" name="nave">${NAVES.map(n=>`<option ${m.ubicacion===n?"selected":""}>${n}</option>`).join("")}</select></label>`;
   const forms={
-    alquilar:`<form class="box" data-act="alquilar"><h3>Alquilar</h3><div class="form">
-      <label class="full" for="a_cli">Cliente<input id="a_cli" name="cliente" required list="locs" placeholder="Nombre del cliente"></label>
-      <label for="a_ini">Inicio<input id="a_ini" name="inicio" type="date" value="${today()}" required></label>
-      <label for="a_fin">Fin previsto<input id="a_fin" name="fin" type="date"></label>
-      <label for="a_pre">Precio al mes (€)<input id="a_pre" name="precioMes" type="number" step="any" inputmode="decimal"></label>
-      <label for="a_hor">Horas contador<input id="a_hor" name="horas" type="number" inputmode="numeric"></label>
-      <label class="full" for="a_not">Notas<input id="a_not" name="detalle" placeholder="Ej. entrega con batería cargada"></label>
-      <div class="btns"><button type="button" class="btn ghost" data-cancel>Cancelar</button><button class="btn primary">Guardar alquiler</button></div></div></form>`,
+    alquilar:rentalForm("alquilar",{inicio:today(),tarifa:"mes"},"",m),
+    editAlq:rentalForm("editAlq",m.alquiler||{},m.ubicacion,m),
     devolver:`<form class="box" data-act="devolver"><h3>Recoger del cliente</h3><div class="form">
       <label for="d_fec">Fecha<input id="d_fec" name="fecha" type="date" value="${today()}" required></label>${naveSel("d_nave")}
       <label for="d_hor">Horas contador<input id="d_hor" name="horas" type="number" inputmode="numeric"></label>
@@ -409,12 +443,14 @@ function renderSheet(){
     if(m.situacion!=="averiada"&&m.situacion!=="taller"&&m.situacion!=="vendida")acts.push(["averia","Anotar avería",""]);
     if(m.situacion==="averiada")acts.push(["taller","Enviar a taller","primary"]);
     if(m.situacion==="averiada"||m.situacion==="taller")acts.push(["reparada","Reparada","primary"]);
+    if(m.situacion==="alquilada")acts.push(["editAlq","Editar alquiler",""]);
     acts.push(["horas","Anotar horas",""],["revision","Revisión hecha",""],["nota","Añadir nota",""],["edit","Editar datos","ghost"]);
     const iss=issuesOf(m);
     body=`${canWrite?`<div class="actions">${acts.map(([k,l,c])=>`<button class="btn ${c}" data-mode="${k}">${l}</button>`).join("")}</div>`:`<p class="note">Solo puedes consultar esta ficha.</p>`}
     ${iss.length?`<div class="flags">${iss.map(i=>`<span class="flag ${i.h?"":"soft"}">${esc(i.k)}</span>`).join("")}</div>`:""}
     ${m.situacion==="alquilada"?`<div class="box"><h3>Alquiler en curso</h3><dl class="kv">
-      <div><dt>Cliente</dt><dd>${esc(m.ubicacion)}</dd></div><div><dt>Precio al mes</dt><dd>${eur(a.precioMes)}</dd></div>
+      <div><dt>Cliente</dt><dd>${esc(m.ubicacion)}</dd></div><div><dt>Ubicación / obra</dt><dd>${esc(a.obra||"—")}</dd></div>
+      <div><dt>Tarifa</dt><dd>${fmtTar(a)}</dd></div><div><dt>Importe estimado</dt><dd>${tarifa(a).t==="mes"&&!a.fin?"—":eur(importe(a))}${duracion(a)?`<div class="note">${duracion(a)} días${a.fin?"":" hasta hoy"}</div>`:""}</dd></div>
       <div><dt>Horas al salir</dt><dd>${fmtH(a.horasInicio)}</dd></div><div><dt>Horas en este alquiler</dt><dd>${a.horasInicio!=null&&m.horas!=null?fmtH(Number(m.horas)-Number(a.horasInicio)):"—"}</dd></div>
       <div><dt>Desde</dt><dd>${fmtD(a.inicio)}</dd></div><div><dt>Hasta</dt><dd>${fmtD(a.fin)}${a.fin&&daysTo(a.fin)<0?' <span class="flag">Vencido</span>':""}</dd></div></dl></div>`:""}
     <div class="box"><h3>Datos de la máquina</h3><dl class="kv">
@@ -436,6 +472,15 @@ function renderSheet(){
       <div style="grid-column:1/-1"><dt>Póliza de seguro</dt><dd class="mono">${esc(m.poliza||"Sin póliza")}</dd></div>
       ${m.notas?`<div style="grid-column:1/-1"><dt>Notas</dt><dd>${esc(m.notas)}</dd></div>`:""}
     </dl></div>
+    <div class="box"><h3>Documentos</h3><div class="docs">
+      <div class="doc"><div class="dt">Foto</div>${m.foto?`<img data-doc="foto" class="photo" alt="Foto de la máquina" hidden>`:`<p class="note" style="margin:0">Sin foto</p>`}
+        ${canWrite?`<label class="btn">${m.foto?"Cambiar foto":"Hacer o subir foto"}<input type="file" accept="image/*" data-up="foto" hidden></label>`:""}</div>
+      <div class="doc"><div class="dt">Certificado CE</div>${m.certCe?`<a data-doc="certCe" class="btn" target="_blank" rel="noopener" hidden>Ver PDF</a>`:`<p class="note" style="margin:0">Sin subir</p>`}
+        ${canWrite?`<label class="btn ghost">${m.certCe?"Cambiar PDF":"Subir PDF"}<input type="file" accept="application/pdf" data-up="certCe" hidden></label>`:""}</div>
+      <div class="doc"><div class="dt">Certificado de seguro</div>${m.certSeguro?`<a data-doc="certSeguro" class="btn" target="_blank" rel="noopener" hidden>Ver PDF</a>`:`<p class="note" style="margin:0">Sin subir</p>`}
+        ${canWrite?`<label class="btn ghost">${m.certSeguro?"Cambiar PDF":"Subir PDF"}<input type="file" accept="application/pdf" data-up="certSeguro" hidden></label>`:""}
+        <label class="cad" for="segCad">Caduca el<input type="date" id="segCad" value="${esc(m.seguroCaduca||"")}" ${canWrite?"":"disabled"}></label></div>
+    </div></div>
     <div class="box"><h3>Historial</h3>${h.length?`<ul class="hist">${h.map(x=>`<li><time>${fmtD(x.fecha)}</time><div><span class="t">${esc(x.tipo)}</span>${x.cliente?" · "+esc(x.cliente):""}${x.porEmail?` <span class="note">· ${esc(x.porEmail.split("@")[0])}</span>`:""}${x.detalle?`<div class="note">${esc(x.detalle)}</div>`:""}</div></li>`).join("")}</ul>`:`<p class="note">Sin movimientos todavía. Cada alquiler, recogida, avería o reparación que anotes quedará aquí.</p>`}</div>`;
   }
   $("#sheetRoot").innerHTML=`<div class="scrim" data-close></div><aside class="sheet" role="dialog" aria-modal="true" aria-label="Ficha de máquina">
@@ -443,6 +488,12 @@ function renderSheet(){
     <button class="btn ghost x" data-close aria-label="Cerrar">✕</button></div>
     <div class="sheet-b">${body}</div></aside>
     <datalist id="locs">${locs.map(l=>`<option value="${esc(l)}">`).join("")}</datalist>`;
+  if(!isNew&&mode==="view")fillDocs(m);
+  calcRental();
+}
+async function fillDocs(m){
+  await urls([m.foto,m.certCe,m.certSeguro]);
+  document.querySelectorAll("#sheetRoot [data-doc]").forEach(el=>{const u=U(m[el.dataset.doc]);if(!u)return;if(el.tagName==="IMG")el.src=u;else el.href=u;el.hidden=false});
 }
 
 /* ---------- base de datos (Supabase) ---------- */
@@ -459,9 +510,43 @@ const maq={
 async function loadAll(){
   const [m,v]=await Promise.all([chk(sb.from("maquinas").select("*")),chk(sb.from("movimientos").select("*"))]);
   machines=m.map(inn);moves=v.map(inn);render();
+  urls(machines.map(x=>x.foto)).then(n=>{if(n)renderGrid()});
 }
 let reloadT=null;
 function scheduleReload(){clearTimeout(reloadT);reloadT=setTimeout(()=>loadAll().catch(()=>{}),250)}
+
+/* ---------- fotos y documentos (Supabase Storage, carpeta privada «documentos») ---------- */
+const urlCache={};
+const U=p=>p&&urlCache[p]&&urlCache[p].exp>Date.now()?urlCache[p].u:"";
+async function urls(paths){
+  paths=[...new Set(paths.filter(p=>p&&!U(p)))];if(!paths.length)return false;
+  const {data}=await sb.storage.from("documentos").createSignedUrls(paths,3600).catch(()=>({data:null}));
+  (data||[]).forEach(x=>{if(x.signedUrl)urlCache[x.path]={u:x.signedUrl,exp:Date.now()+3500e3}});return true;
+}
+async function shrink(file){
+  const img=await createImageBitmap(file).catch(()=>null);if(!img)return file;
+  const k=Math.min(1,1600/Math.max(img.width,img.height)),c=document.createElement("canvas");
+  c.width=Math.round(img.width*k);c.height=Math.round(img.height*k);c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+  return await new Promise(r=>c.toBlob(b=>r(b||file),"image/jpeg",0.82));
+}
+const DOCN={foto:"Foto nueva",certCe:"Certificado CE subido",certSeguro:"Certificado de seguro subido"};
+async function upload(kind,file){
+  const m=machines.find(x=>x.id===openId);if(!m)return;
+  const isPdf=kind!=="foto";
+  if(isPdf&&file.type!=="application/pdf"){toast("El certificado tiene que ser un PDF");return}
+  if(!isPdf&&!file.type.startsWith("image/")){toast("Elige una foto");return}
+  const blob=isPdf?file:await shrink(file);
+  if(blob.size>10*1024*1024){toast("El archivo pasa de 10 MB. Reduce el PDF y vuelve a intentarlo.");return}
+  toast("Subiendo…");
+  const path=`${m.id}/${kind}-${Date.now()}.${isPdf?"pdf":"jpg"}`;
+  const {error}=await sb.storage.from("documentos").upload(path,blob,{contentType:isPdf?"application/pdf":"image/jpeg"});
+  if(error){toast("No se pudo subir: "+error.message);return}
+  const old=m[kind];
+  try{await maq.update(m.id,{[kind]:path})}catch(e){toast("No se pudo guardar el archivo en la ficha");return}
+  if(old)sb.storage.from("documentos").remove([old]).catch(()=>{});
+  await addMove(m.id,{tipo:DOCN[kind]});
+  toast(kind==="certSeguro"&&!m.seguroCaduca?"Subido. Pon la fecha de caducidad del seguro.":"Subido");
+}
 
 /* ---------- escrituras ---------- */
 async function addMove(id,o){
@@ -486,13 +571,29 @@ async function submit(form){
       toast("Datos guardados");
     }else if(act==="alquilar"){
       const cli=d.cliente.trim();
-      await ref.update({situacion:"alquilada",ubicacion:cli,alquiler:{inicio:d.inicio,fin:d.fin||"",precioMes:num(d.precioMes),horasInicio:H??(m.horas===""?null:m.horas??null)},...hrs});
-      await addMove(id,{tipo:"Alquiler",fecha:d.inicio,cliente:cli,detalle:[d.fin?"Fin previsto "+fmtD(d.fin):"",d.precioMes?eur(d.precioMes)+"/mes":"",H!=null?"Sale con "+fmtH(H):"",d.detalle].filter(Boolean).join(" · ")});
+      const al={inicio:d.inicio,fin:d.fin||"",obra:(d.obra||"").trim(),tarifa:d.tarifa,precio:num(d.precio),horasInicio:H??(m.horas===""?null:m.horas??null)};
+      await ref.update({situacion:"alquilada",ubicacion:cli,alquiler:al,...hrs});
+      await addMove(id,{tipo:"Alquiler",fecha:d.inicio,cliente:cli,detalle:[al.obra,d.fin?"Fin previsto "+fmtD(d.fin):"",al.precio!=null?fmtTar(al):"",H!=null?"Sale con "+fmtH(H):"",d.detalle].filter(Boolean).join(" · ")});
       toast("Alquiler guardado");
+    }else if(act==="editAlq"){
+      const cli=d.cliente.trim(),old=m.alquiler||{};
+      const {precioMes,...rest}=old;
+      const al={...rest,inicio:d.inicio,fin:d.fin||"",obra:(d.obra||"").trim(),tarifa:d.tarifa,precio:num(d.precio),horasInicio:num(d.horasInicio)};
+      const cambios=[];
+      if(cli!==m.ubicacion)cambios.push(`cliente ${m.ubicacion} → ${cli}`);
+      if((old.obra||"")!==al.obra)cambios.push(`obra ${al.obra||"—"}`);
+      if((old.inicio||"")!==al.inicio)cambios.push(`inicio ${fmtD(al.inicio)}`);
+      if((old.fin||"")!==al.fin)cambios.push(`fin ${fmtD(al.fin)}`);
+      if(fmtTar(old)!==fmtTar(al))cambios.push(`tarifa ${fmtTar(al)}`);
+      if((old.horasInicio??null)!==al.horasInicio)cambios.push(`horas al salir ${fmtH(al.horasInicio)}`);
+      await ref.update({ubicacion:cli,alquiler:al});
+      await addMove(id,{tipo:"Alquiler corregido",cliente:cli,detalle:[cambios.join(", ")||"sin cambios",d.detalle].filter(Boolean).join(" · ")});
+      toast("Alquiler corregido");
     }else if(act==="devolver"){
       const hi=m.alquiler?.horasInicio, uso=H!=null&&hi!=null&&hi!==""?H-Number(hi):null;
       await ref.update({situacion:d.estado,ubicacion:d.nave,alquiler:null,...hrs});
-      await addMove(id,{tipo:"Recogida",fecha:d.fecha,cliente:m.ubicacion,detalle:[`A ${d.nave}`,d.estado==="averiada"?"llega averiada":"",H!=null?"Vuelve con "+fmtH(H):"",uso!=null?fmtH(uso)+" de uso":"",d.detalle].filter(Boolean).join(" · ")});
+      const alq=m.alquiler||{},imp=tarifa(alq).p!=null?importe({...alq,fin:d.fecha}):null;
+      await addMove(id,{tipo:"Recogida",fecha:d.fecha,cliente:m.ubicacion,detalle:[alq.obra,`A ${d.nave}`,imp!=null?"Importe aprox. "+eur(imp):"",d.estado==="averiada"?"llega averiada":"",H!=null?"Vuelve con "+fmtH(H):"",uso!=null?fmtH(uso)+" de uso":"",d.detalle].filter(Boolean).join(" · ")});
       toast("Recogida guardada");
     }else if(act==="averia"){
       await ref.update({situacion:"averiada"});await addMove(id,{tipo:"Avería",fecha:d.fecha,detalle:d.detalle,cliente:m.situacion==="alquilada"?m.ubicacion:""});toast("Avería anotada");
@@ -542,6 +643,13 @@ document.addEventListener("click",async e=>{
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&openId)closeSheet();if(e.key==="Enter"&&e.target.classList?.contains("issue"))openSheet(e.target.dataset.id)});
 document.addEventListener("submit",e=>{e.preventDefault();submit(e.target)});
 $("#q").addEventListener("input",e=>{filt.q=e.target.value;renderGrid()});
+document.addEventListener("change",async e=>{
+  const t=e.target;
+  if(t.dataset?.up&&t.files?.[0]){upload(t.dataset.up,t.files[0]);t.value="";return}
+  if(t.id==="segCad"&&openId){try{await maq.update(openId,{seguroCaduca:t.value||null});scheduleReload();toast("Fecha de caducidad guardada")}catch(err){toast("No se pudo guardar la fecha")}}
+  if(t.closest?.('form[data-act="alquilar"],form[data-act="editAlq"]'))calcRental();
+});
+document.addEventListener("input",e=>{if(e.target.closest?.('form[data-act="alquilar"],form[data-act="editAlq"]'))calcRental()});
 $("#fTipo").addEventListener("change",e=>{filt.tipo=e.target.value;renderGrid()});
 $("#fComb").addEventListener("change",e=>{filt.comb=e.target.value;renderGrid()});
 $("#fLoc").addEventListener("change",e=>{filt.loc=e.target.value;renderGrid()});
@@ -549,9 +657,9 @@ try{const tb=localStorage.getItem("tab");if(tb&&tb!=="maquinas")setTimeout(()=>d
 
 
 async function exportCsv(){
-  const H=["Nº interno","Tipo","Año compra","Marca","Modelo","Nº serie","Combustible","Potencia kW","Año","Coste €","PVP €","Mástil","Altura mm","Ruedas","Situación","Ubicación / cliente","Alquiler desde","Alquiler hasta","€/mes","Horas","Fecha lectura","Próxima revisión (h)","Próxima revisión (fecha)","Póliza","Notas"];
+  const H=["Nº interno","Tipo","Año compra","Marca","Modelo","Nº serie","Combustible","Potencia kW","Año","Coste €","PVP €","Mástil","Altura mm","Ruedas","Situación","Ubicación / cliente","Ubicación / obra","Alquiler desde","Alquiler hasta","Tarifa","Importe estimado","Horas","Fecha lectura","Próxima revisión (h)","Próxima revisión (fecha)","Póliza","Seguro caduca","Notas"];
   const q=v=>{v=v==null?"":String(v);return /[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
-  const rows=machines.slice().sort(cmp).map(m=>[label(m),m.tipo||"Carretilla",m.anioCompra,m.marca,m.modelo,m.serie,m.combustible,String(m.potenciaKw??"").replace(".",","),m.anio,m.coste,m.pvp,m.mastil,m.alturaMastil,m.ruedas,ST[m.situacion]?.l,m.ubicacion,fmtD(m.alquiler?.inicio),fmtD(m.alquiler?.fin),m.alquiler?.precioMes,m.horas,fmtD(m.horasFecha),m.proximaRevisionH,fmtD(m.proximaRevisionFecha),m.poliza,m.notas].map(q).join(";"));
+  const rows=machines.slice().sort(cmp).map(m=>[label(m),m.tipo||"Carretilla",m.anioCompra,m.marca,m.modelo,m.serie,m.combustible,String(m.potenciaKw??"").replace(".",","),m.anio,m.coste,m.pvp,m.mastil,m.alturaMastil,m.ruedas,ST[m.situacion]?.l,m.ubicacion,m.alquiler?.obra,fmtD(m.alquiler?.inicio),fmtD(m.alquiler?.fin),m.situacion==="alquilada"?fmtTar(m.alquiler):"",m.situacion==="alquilada"&&tarifa(m.alquiler).t!=="mes"?importe(m.alquiler):"",m.horas,fmtD(m.horasFecha),m.proximaRevisionH,fmtD(m.proximaRevisionFecha),m.poliza,fmtD(m.seguroCaduca),m.notas].map(q).join(";"));
   const blob=new Blob([String.fromCharCode(0xFEFF)+[H.join(";"),...rows].join("\r\n")],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`flota_${today()}.csv`;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
 }
