@@ -1,0 +1,21 @@
+# Supabase pausa los proyectos gratuitos tras 7 días sin uso.
+# Este aviso consulta la base de datos cada 3 días para que nunca se pause.
+name: Mantener Supabase activo
+
+on:
+  schedule:
+    - cron: "17 7 */3 * *"   # cada 3 días, a las 7:17 UTC
+  workflow_dispatch:          # botón «Run workflow» para probarlo a mano
+
+jobs:
+  latido:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Consultar la base de datos
+        run: |
+          URL=$(grep -oP 'url:\s*"\K[^"]+' config.js)
+          KEY=$(grep -oP 'anonKey:\s*"\K[^"]+' config.js)
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" "$URL/rest/v1/maquinas?select=id&limit=1" -H "apikey: $KEY")
+          echo "Respuesta de Supabase: $CODE"
+          test "$CODE" = "200"
